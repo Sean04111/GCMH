@@ -19,3 +19,6 @@ class BatchData(DataSet):
         # 强制要求images和labels的长度相等
         assert len(self.images) ==  len(self.labels)
         return length
+
+def load_data():
+    

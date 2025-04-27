@@ -1,0 +1,6 @@
+data:
+  base_dir: ./datasets/
+  data_name: nus
+  label_file: nus-wide-tc10-lall.mat
+  text_file: nus-wide-tc10-yall.mat
+  image_file: /IAll/nus-wide-tc10-iall.mat
