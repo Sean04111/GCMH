@@ -1,0 +1,15 @@
+base_path: ./datasets/
+data_name: nus
+model_name: vgg19
+label_path: nus-wide-tc10-lall.mat
+text_path: nus-wide-tc10-yall.mat
+image_path: /IAll/nus-wide-tc10-iall.mat
+
+test_num: 2000
+val_num: 2000
+train_num: 5000
+
+feature_model_name: resnet50
+
+
+batch_size: 128
