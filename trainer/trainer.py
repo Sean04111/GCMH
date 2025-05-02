@@ -131,12 +131,12 @@ class Trainer:
             _, HashCode_Img = self.ImgNet(img)
             _, HashCode_Txt = self.TxtNet(txt)
 
-            loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sigh(), Sgc, I)
+            loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign(), Sgc, I)
             self.opt_Img.zero_grad()
             loss_img.backward(retain_graph=True)
             self.opt_Img.step()
 
-            loss_txt = self._loss_cal(HashCode_Img.sigh(), HashCode_Txt, Sgc, I)
+            loss_txt = self._loss_cal(HashCode_Img.sign(), HashCode_Txt, Sgc, I)
             self.opt_Txt.zero_grad()
             loss_txt.backward()
             self.opt_Txt.step()
