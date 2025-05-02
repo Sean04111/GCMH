@@ -109,40 +109,41 @@ class Trainer:
         self.ImgNet.cuda().train()
         self.TxtNet.cuda().train()
         epoch_num = self.config['epoch_num']
+        
+        for epoch in range(epoch_num):
+            for idx, (img, txt, labels, index) in enumerate(self.train_loader):
+                img = Variable(img).cuda()
+                txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
 
-        for idx, (img, txt, labels, index) in enumerate(self.train_loader):
-            img = Variable(img).cuda()
-            txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
+                batch_size = img.size(0)
+                I = torch.eye(batch_size).cuda()
+                _, HashCode_Img = self.ImgNet(img)
+                _, HashCode_Txt = self.TxtNet(txt)
+                Sgc = self.Sgc[index, :][:, index].cuda()
 
-            batch_size = img.size(0)
-            I = torch.eye(batch_size).cuda()
-            _, HashCode_Img = self.ImgNet(img)
-            _, HashCode_Txt = self.TxtNet(txt)
-            Sgc = self.Sgc[index, :][:, index].cuda()
+                loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
 
-            loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
+                self.opt_Img.zero_grad()
+                self.opt_Txt.zero_grad()
+                loss.backward(retain_graph=True)
+                self.opt_Img.step()
+                self.opt_Txt.step()
 
-            self.opt_Img.zero_grad()
-            self.opt_Txt.zero_grad()
-            loss.backward(retain_graph=True)
-            self.opt_Img.step()
-            self.opt_Txt.step()
+                _, HashCode_Img = self.ImgNet(img)
+                _, HashCode_Txt = self.TxtNet(txt)
 
-            _, HashCode_Img = self.ImgNet(img)
-            _, HashCode_Txt = self.TxtNet(txt)
+                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
+                self.opt_Img.zero_grad()
+                loss_img.backward(retain_graph=True)
+                self.opt_Img.step()
 
-            loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
-            self.opt_Img.zero_grad()
-            loss_img.backward(retain_graph=True)
-            self.opt_Img.step()
+                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
+                self.opt_Txt.zero_grad()
+                loss_txt.backward()
+                self.opt_Txt.step()
 
-            loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
-            self.opt_Txt.zero_grad()
-            loss_txt.backward()
-            self.opt_Txt.step()
+                # 计算mAP
+                mAP_I2T, mAP_T2I = self._eval()
 
-            # 计算mAP
-            mAP_I2T, mAP_T2I = self._eval()
-
-            log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(idx, loss, mAP_I2T, mAP_T2I))
+                log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
             
