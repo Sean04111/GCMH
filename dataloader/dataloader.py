@@ -8,7 +8,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 
 
-class BatchData(DataSet):
+class BatchData(Dataset):
     def __init__(self, images, texts, labels):
         self.images = images
         self.texts = texts
@@ -37,7 +37,7 @@ class DataLoader:
         return self.dataloaders[key]
 
     def _load_data(self):
-        base_path = self.config['base_dir'] + self.config['data_name']
+        base_path = self.config['base_path'] + self.config['data_name']
         npy_name = self.config['data_name'] + '_' + self.config['model_name'] + '.npy'
 
         images = np.load(base_path + npy_name)

@@ -122,7 +122,6 @@ class Trainer:
             _, HashCode_Txt = self.TxtNet(txt)
             Sgc = self.Sgc[index, :][:, index].cuda()
 
-
             loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
 
             self.opt_Img.zero_grad()
@@ -146,4 +145,6 @@ class Trainer:
 
             # 计算mAP
             mAP_I2T, mAP_T2I = self._eval()
+
+            log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(idx, loss, mAP_I2T, mAP_T2I))
             
