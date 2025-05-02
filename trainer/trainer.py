@@ -86,10 +86,10 @@ class Trainer:
         all_1 = torch.rand(T_T.size(0)).fill_(1).cuda()
         loss_pair = F.mse_loss(diagonal, self.config['K'] * all_1)
 
-        loss_dis_1 = F.mse_loss(T_T * (1-I), S* (1-I))
-        loss_dis_2 = F.mse_loss(I_T * (1-I), S* (1-I))
-        loss_dis_3 = F.mse_loss(I_I * (1-I), S* (1-I))
-        loss_dis_4 = F.mse_loss(T_I * (1-I), S* (1-I))
+        loss_dis_1 = F.mse_loss(T_T * (1-I), Sgc* (1-I))
+        loss_dis_2 = F.mse_loss(I_T * (1-I), Sgc* (1-I))
+        loss_dis_3 = F.mse_loss(I_I * (1-I), Sgc* (1-I))
+        loss_dis_4 = F.mse_loss(T_I * (1-I), Sgc* (1-I))
 
         loss_cons = F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)
 
