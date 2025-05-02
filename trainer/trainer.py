@@ -57,11 +57,11 @@ class Trainer:
         distance_matrix_v2 = distance_matrix.clone()
         m, n1 = distance_matrix_v2.sort()
         k_rows = torch.arange(batch_size).view(-1,1).repeat(1, K).view(-1)
-        k_cols = n1[:, :K].contigurous().view(-1)
+        k_cols = n1[:, :K].contiguous().view(-1)
         distance_matrix_v2[k_rows, k_cols] = 0.
 
         top_rows = torch.arange(batch_size).view(-1)
-        top_cols = n1[:, -1:].contigurous().view(-1)
+        top_cols = n1[:, -1:].contiguous().view(-1)
         distance_matrix_v2[top_rows, top_cols] = 0.
 
         distance_matrix_v2 = distance_matrix_v2 / distance_matrix_v2.sum(1).view(-1,1)
