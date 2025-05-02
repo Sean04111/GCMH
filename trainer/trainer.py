@@ -83,7 +83,7 @@ class Trainer:
         T_I = cosine_similarity(HashCode_Txt, HashCode_Img)
 
         diagonal = I_T.diagonal()
-        all_1 = torch.rand(T_T,size(0)).fill_(1).cuda()
+        all_1 = torch.rand(T_T.size(0)).fill_(1).cuda()
         loss_pair = F.mse_loss(diagonal, slef.config['K'] * all_1)
 
         loss_dis_1 = F.mse_loss(T_T * (1-I), S* (1-I))
