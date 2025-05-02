@@ -24,9 +24,7 @@ class Trainer:
         self.query_loader = dataloader['query']
         self.database_loader = dataloader['database']
 
-        train_imgs = self.train_loader.images
-        train_txts = self.train_loader.texts
-        train_labels = dself.train_loader.labels
+        train_imgs,train_txts,train_labels = self.train_loader.get_all_data()
 
         train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
         train_txts = F.normalize(torch.Tensor(train_txts).cuda())

@@ -26,6 +26,9 @@ class BatchData(Dataset):
         assert len(self.images) ==  len(self.labels)
         return length
 
+    def get_all_data(self):
+        return self.images, self.texts, self.labels
+
 
 class CustomDataLoader:
     def __init__(self, config):
