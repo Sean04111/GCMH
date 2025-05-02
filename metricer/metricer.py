@@ -4,7 +4,7 @@ class Metricer:
     def __init__(self, config):
         self.config = config
     
-    def _compress(train_loader, test_loader, model_I, model_T):
+    def _compress(self, train_loader, test_loader, model_I, model_T):
         re_BI = list([])
         re_BT = list([])
         re_L = list([])
