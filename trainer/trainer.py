@@ -144,6 +144,7 @@ class Trainer:
 
                 # 计算mAP
                 mAP_I2T, mAP_T2I = self._eval()
-
-                log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
+                
+                if idx == len(self.train_loader) - 1:
+                    log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
             
