@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 import numpy as np
 from config.config import Config
-from dataloader.dataloader import DataLoader
+from dataloader.dataloader import CustomDataLoader
 from utils.similarity import cosine_similarity
 from models.ImgNet import ImgNet
 from models.TxtNet import TxtNet
@@ -17,7 +17,7 @@ class Trainer:
     def __init__(self, config_path):
         self.config = Config(config_path=config_path)
         self.metricer = Metricer(config=self.config)
-        dataloader = DataLoader(config=self.config)
+        dataloader = CustomDataLoader(config=self.config)
 
         self.train_loader = dataloader['train']
         self.val_loader = dataloader['validation']

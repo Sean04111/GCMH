@@ -27,7 +27,7 @@ class BatchData(Dataset):
         return length
 
 
-class DataLoader:
+class CustomDataLoader:
     def __init__(self, config):
         self.config = config
         self.dataloaders = {}
@@ -42,7 +42,7 @@ class DataLoader:
 
         images = np.load(base_path + npy_name)
         tags = np.load(base_path + 'tags.npy')
-        label = np.load(base_path + 'label,npy')
+        label = np.load(base_path + 'label.npy')
 
         test_num = np.load(base_path + 'test_num.npy')
         val_num = np.load(base_path + 'val_num.npy')
