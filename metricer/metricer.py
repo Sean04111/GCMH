@@ -47,24 +47,24 @@ class Metricer:
         qu_L = np.array(qu_L)
         return re_BI, re_BT, re_L, qu_BI, qu_BT, qu_L
 
-    def calculate_hamming(B1, B2):
-        leng = B2.shape[1]  # max inner product value
+    def calculate_hamming(self, B1, B2):  # 添加 self 参数
+        leng = B2.shape[1]
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
     def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label):
-        num_query = qu_L.shape[0]
+        num_query = query_Label.shape[0]  # 修改 qu_Label 为 query_Label
         map = 0
         for iter in range(num_query):
             gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
-            tsum =np.int(np.sum(gnd))
+            tsum = int(np.sum(gnd))  # 修改 np.int 为 int
             if tsum == 0:
                 continue
             hamm = self.calculate_hamming(query_HashCode[iter, :], retrieval_HashCode)
             ind = np.argsort(hamm)
             gnd = gnd[ind]
 
-            count = np.linspace(1, tsum, tsum)  # [1,2, tsum]
+            count = np.linspace(1, tsum, tsum)
             tindex = np.asarray(np.where(gnd == 1)) + 1.0
             map_ = np.mean(count / (tindex))
             map = map + map_
