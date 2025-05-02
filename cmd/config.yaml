@@ -7,6 +7,8 @@ learning_rate: 0.05
 momentum: 0.9
 weight_decay: 0.0005
 epoch_num: 100
+dw: 1
+cw: 1
 
 label_path: mini_nus-tc10-lall.mat
 text_path: mini_nus-tc10-yall.mat
