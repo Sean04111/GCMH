@@ -53,7 +53,7 @@ class Trainer:
         distance_matrix = (1-distance_weight) * images_self_similarity + distance_weight * texts_self_similarity
 
         # 基于k近邻计算两节点相似度
-        K = self.config['K']
+        K = self.config['KNN']
         distance_matrix_v2 = distance_matrix.clone()
         m, n1 = distance_matrix_v2.sort()
         k_rows = torch.arange(batch_size).view(-1,1).repeat(1, K).view(-1)
