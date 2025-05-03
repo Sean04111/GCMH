@@ -4,14 +4,16 @@ from torch.autograd import Variable
 
 
 class Metricer:
-    def __init__(self, config):
+    def __init__(self, config, qurey_img_names, qurey_raw_texts):
         self.config = config
+        self.qurey_img_names = qurey_img_names
+        self.qurey_raw_texts = qurey_raw_texts
     
-    def _compress(self, train_loader, test_loader, model_I, model_T):
+    def _compress(self, database_loader, query_loader, model_I, model_T):
         re_BI = list([])
         re_BT = list([])
         re_L = list([])
-        for _, (data_I, data_T, data_L, _) in enumerate(train_loader):
+        for _, (data_I, data_T, data_L, _) in enumerate(database_loader):
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -26,7 +28,9 @@ class Metricer:
         qu_BI = list([])
         qu_BT = list([])
         qu_L = list([])
-        for _, (data_I, data_T, data_L, _) in enumerate(test_loader):
+        for idx, (data_I, data_T, data_L, _) in enumerate(query_loader):
+            log("查询图像 : ", self.qurey_img_names[idx])
+            log("查询图像文本 : ", self.qurey_raw_texts[idx])
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -52,10 +56,13 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, top_n=5):
         num_query = query_Label.shape[0]
         map = 0
         large_hamming_samples = []  # 存储汉明距离过大的样本
+        
+        # 存储所有样本的汉明距离信息
+        all_hamming_samples = []
         
         for iter in range(num_query):
             gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
@@ -75,36 +82,31 @@ class Metricer:
                     'hamming_distances': hamm[large_hamming_indices]
                 })
 
+            # 记录所有样本的汉明距离
+            for ret_idx, hamming_dist in enumerate(hamm):
+                all_hamming_samples.append({
+                    'query_index': iter,
+                    'retrieval_index': ret_idx,
+                    'hamming_distance': hamming_dist,
+                    'query_img_name': self.qurey_img_names[iter],
+                    'query_text': self.qurey_raw_texts[iter]
+                })
+
             count = np.linspace(1, tsum, tsum)
             tindex = np.asarray(np.where(gnd == 1)) + 1.0
             map_ = np.mean(count / (tindex))
             map = map + map_
         map = map / num_query
+
+        # 按汉明距离排序并输出前n个
+        all_hamming_samples.sort(key=lambda x: x['hamming_distance'], reverse=True)
+        print("\n汉明距离最大的前{}个样本:".format(top_n))
+        print("-" * 100)
+        for i, sample in enumerate(all_hamming_samples[:top_n]):
+            print(f"排名 {i+1}:")
+            print(f"查询图像: {sample['query_img_name']}")
+            print(f"查询文本: {sample['query_text']}")
+            print(f"汉明距离: {sample['hamming_distance']:.4f}")
+            print("-" * 100)
+
         return map, large_hamming_samples
-
-    def show_large_hamming_samples(self, large_hamming_samples, query_loader, database_loader):
-        """
-        展示汉明距离过大的样本
-        :param large_hamming_samples: 汉明距离过大的样本列表
-        :param query_loader: 查询数据加载器
-        :param database_loader: 数据库数据加载器
-        """
-        if not large_hamming_samples:
-            print("没有找到汉明距离过大的样本")
-            return
-
-        print("\n汉明距离过大的样本:")
-        print("-" * 50)
-        
-        for sample in large_hamming_samples:
-            query_idx = sample['query_index']
-            retrieval_indices = sample['retrieval_indices']
-            hamming_distances = sample['hamming_distances']
-            
-            print(f"\n查询样本: query_{query_idx}")
-            print("对应的检索样本:")
-            for i, (ret_idx, hamming_dist) in enumerate(zip(retrieval_indices, hamming_distances)):
-                if i >= 5:  # 只显示前5个
-                    break
-                print(f"retrieval_{ret_idx} (汉明距离: {hamming_dist:.4f})")
-            print("-" * 50)

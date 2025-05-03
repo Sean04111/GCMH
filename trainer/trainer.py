@@ -16,7 +16,6 @@ from utils.logger import log
 class Trainer:
     def __init__(self, config_path):
         self.config = Config(config_path=config_path)
-        self.metricer = Metricer(config=self.config)
         dataloader = CustomDataLoader(config=self.config)
 
         self.train_loader = dataloader['train']
@@ -24,7 +23,10 @@ class Trainer:
         self.query_loader = dataloader['query']
         self.database_loader = dataloader['database']
 
-        train_imgs,train_txts,train_labels = self.train_loader.dataset.get_all_data()
+        train_imgs,train_txts,train_labels,_, _ = self.train_loader.dataset.get_all_data()
+        _, _, _, self.query_img_names, self.query_raw_texts = self.query_loader.dataset.get_all_data()
+
+        self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts)
 
         train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
         train_txts = F.normalize(torch.Tensor(train_txts).cuda())
@@ -101,10 +103,12 @@ class Trainer:
 
     # 计算mAP@ALL
     def _eval(self):
-        re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.query_loader, self.database_loader, self.ImgNet, self.TxtNet)
+        re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
         mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label)
         mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label)
-        
+
+        log("I2T 任务，异常样本 : ", large_hamming_I2T)
+        log("T2I 任务，异常样本 : ", large_hamming_T2I)
         
         return mAP_I2T, mAP_T2I
 

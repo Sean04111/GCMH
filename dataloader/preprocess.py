@@ -47,11 +47,18 @@ class PreProcessor:
         else:
             raise ValueError('unkown model name')
     
+    def wirfickr(self):
+        pass
+    def nus_wide(self):
+        pass
     # 提取特征
     def extract(self):
-        labels = self.label['LAll']
-        texts = self.text['YAll']
-        images = self.image['IAll']
+        if self.config['data_name'] == 'nus':
+            labels = self.label['LAll']
+            texts = self.text['YAll']
+            images = self.image['IAll']
+
+            
 
         all_img = []
 
