@@ -80,8 +80,8 @@ class Trainer:
         return S, distance_matrix, p
 
     def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I):
-        norm_HashCode_Img = F.normalize(HashCode_Img, dim=1)
-        norm_HashCode_Txt = F.normalize(HashCode_Txt, dim=1)
+        norm_HashCode_Img = F.normalize(HashCode_Img)
+        norm_HashCode_Txt = F.normalize(HashCode_Txt)
 
         I_I = cosine_similarity(norm_HashCode_Img, norm_HashCode_Img)
         T_T = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Txt)
@@ -153,12 +153,12 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
 
-                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
+                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
                 self.opt_Img.zero_grad()
                 loss_img.backward(retain_graph=True)
                 self.opt_Img.step()
 
-                loss_txt = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
+                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
