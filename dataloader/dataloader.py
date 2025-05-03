@@ -56,6 +56,11 @@ class CustomDataLoader:
         train_num = np.load(base_path + 'train_num.npy')
         database_num = np.load(base_path + 'database_num.npy')
 
+        log("训练数据集数量 : " + str(len(train_num)))
+        log("验证数据集数量 : " + str(len(val_num)))
+        log("测试数据集数量 : " + str(len(test_num)))
+        log("数据库数据集数量 : " + str(len(database_num)))
+
         # 类型转换
         images = images.astype(np.float32)
         tags = tags.astype(np.float32)

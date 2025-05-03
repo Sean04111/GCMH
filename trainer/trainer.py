@@ -119,15 +119,20 @@ class Trainer:
         epoch_num = self.config['epoch_num']
         
         for epoch in range(epoch_num):
-            for idx, (img, txt, labels, index) in enumerate(self.train_loader):
+            for idx, (img, txt, labels, img_name, raw_text) in enumerate(self.train_loader):
                 img = Variable(img).cuda()
                 txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
-
+                
+                # 获取当前批次中每个样本的全局索引
+                batch_indices = torch.arange(idx * self.config['batch_size'], 
+                                          min((idx + 1) * self.config['batch_size'], 
+                                              len(self.train_loader.dataset))).cuda()
+                
                 batch_size = img.size(0)
                 I = torch.eye(batch_size).cuda()
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
-                Sgc = self.Sgc[index, :][:, index].cuda()
+                Sgc = self.Sgc[batch_indices, :][:, batch_indices].cuda()
 
                 loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
 
@@ -150,9 +155,8 @@ class Trainer:
                 loss_txt.backward()
                 self.opt_Txt.step()
 
-                # 计算mAP
-                mAP_I2T, mAP_T2I = self._eval()
                 
                 if (idx + 1) % len(self.train_loader) == 0:
+                    mAP_I2T, mAP_T2I = self._eval()
                     log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
             

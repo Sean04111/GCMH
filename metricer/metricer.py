@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from torch.autograd import Variable
 
+from utils.logger import log
+
 
 class Metricer:
     def __init__(self, config, qurey_img_names, qurey_raw_texts):
@@ -13,7 +15,7 @@ class Metricer:
         re_BI = list([])
         re_BT = list([])
         re_L = list([])
-        for _, (data_I, data_T, data_L, _) in enumerate(database_loader):
+        for _, (data_I, data_T, data_L, _,_) in enumerate(database_loader):
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -28,9 +30,9 @@ class Metricer:
         qu_BI = list([])
         qu_BT = list([])
         qu_L = list([])
-        for idx, (data_I, data_T, data_L, _) in enumerate(query_loader):
-            log("查询图像 : ", self.qurey_img_names[idx])
-            log("查询图像文本 : ", self.qurey_raw_texts[idx])
+        for idx, (data_I, data_T, data_L, _,_) in enumerate(query_loader):
+            log("查询图像 : " + self.qurey_img_names[idx])
+            log("查询图像文本 : " + self.qurey_raw_texts[idx])
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
