@@ -56,7 +56,7 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, top_n=5):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label):
         num_query = query_Label.shape[0]
         map = 0
         large_hamming_samples = []  # 存储汉明距离过大的样本
@@ -100,13 +100,6 @@ class Metricer:
 
         # 按汉明距离排序并输出前n个
         all_hamming_samples.sort(key=lambda x: x['hamming_distance'], reverse=True)
-        print("\n汉明距离最大的前{}个样本:".format(self.config['top_n']))
-        print("-" * 100)
-        for i, sample in enumerate(all_hamming_samples[:self.config['top_n']]):
-            print(f"排名 {i+1}:")
-            print(f"查询图像: {sample['query_img_name']}")
-            print(f"查询文本: {sample['query_text']}")
-            print(f"汉明距离: {sample['hamming_distance']:.4f}")
-            print("-" * 100)
 
-        return map, large_hamming_samples
+        top_hamming_samples = all_hamming_samples[:self.config['top_hamming']]
+        return map, top_hamming_samples
