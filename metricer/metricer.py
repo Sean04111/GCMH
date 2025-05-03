@@ -56,50 +56,52 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, verbose=False):
         num_query = query_Label.shape[0]
-        map = 0
-        large_hamming_samples = []  # 存储汉明距离过大的样本
-        
-        # 存储所有样本的汉明距离信息
-        all_hamming_samples = []
-        
+        total_ap = 0
+
+        all_positive_samples = []
+
         for iter in range(num_query):
             gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
             tsum = int(np.sum(gnd))
             if tsum == 0:
                 continue
+
             hamm = self.calculate_hamming(query_HashCode[iter, :], retrieval_HashCode)
-            ind = np.argsort(hamm)
-            gnd = gnd[ind]
 
-            # 记录汉明距离过大的样本
-            large_hamming_indices = np.where(hamm > np.mean(hamm) + 2 * np.std(hamm))[0]
-            if len(large_hamming_indices) > 0:
-                large_hamming_samples.append({
-                    'query_index': iter,
-                    'retrieval_indices': large_hamming_indices,
-                    'hamming_distances': hamm[large_hamming_indices]
-                })
+            # 正样本索引
+            positive_indices = np.where(gnd == 1)[0]
 
-            # 记录所有样本的汉明距离
-            for ret_idx, hamming_dist in enumerate(hamm):
-                all_hamming_samples.append({
-                    'query_index': iter,
-                    'retrieval_index': ret_idx,
-                    'hamming_distance': hamming_dist,
+            # 排序索引（从小到大）
+            sorted_indices = np.argsort(hamm)
+            sorted_gnd = gnd[sorted_indices]
+            sorted_hamm = hamm[sorted_indices]
+
+            # 可选：打印排序列表及正负情况
+            if verbose:
+                print(f"\n=== Query {iter} ===")
+                print(f"Query Image Name: {self.qurey_img_names[iter]}")
+                print(f"Query Text: {self.qurey_raw_texts[iter]}")
+                print("Top-20 Retrieval Results:")
+                for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:20], sorted_hamm[:20], sorted_gnd[:20])):
+                    symbol = "✔" if is_pos else "✘"
+                    print(f"  Rank {rank+1:2d}: Index={idx:4d}, Hamming={h_dist:.1f}, Match={symbol}")
+
+            # 收集正样本信息
+            for pos_idx in positive_indices:
+                all_positive_samples.append({
+                    'hamming_distance': hamm[pos_idx],
                     'query_img_name': self.qurey_img_names[iter],
                     'query_text': self.qurey_raw_texts[iter]
                 })
 
+            # 计算 AP
             count = np.linspace(1, tsum, tsum)
-            tindex = np.asarray(np.where(gnd == 1)) + 1.0
-            map_ = np.mean(count / (tindex))
-            map = map + map_
-        map = map / num_query
+            tindex = np.asarray(np.where(sorted_gnd == 1)) + 1.0
+            ap = np.mean(count / (tindex))
+            total_ap += ap
 
-        # 按汉明距离排序并输出前n个
-        all_hamming_samples.sort(key=lambda x: x['hamming_distance'], reverse=True)
+        mAP = total_ap / num_query
+        return mAP, all_positive_samples
 
-        top_hamming_samples = all_hamming_samples[:self.config['top_hamming']]
-        return map, top_hamming_samples
