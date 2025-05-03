@@ -102,8 +102,16 @@ class Trainer:
     # 计算mAP@ALL
     def _eval(self):
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.query_loader, self.database_loader, self.ImgNet, self.TxtNet)
-        mAP_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label)
-        mAP_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label)
+        mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label)
+        mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label)
+        
+        # 展示汉明距离过大的样本
+        print("\n图像到文本检索中的汉明距离过大样本:")
+        self.metricer.show_large_hamming_samples(large_hamming_I2T, self.query_loader, self.database_loader)
+        
+        print("\n文本到图像检索中的汉明距离过大样本:")
+        self.metricer.show_large_hamming_samples(large_hamming_T2I, self.query_loader, self.database_loader)
+        
         return mAP_I2T, mAP_T2I
 
     # 自训练

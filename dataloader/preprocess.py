@@ -49,9 +49,9 @@ class PreProcessor:
     
     # 提取特征
     def extract(self):
-        labels = self.label['LALL']
-        texts = self.text['YALL']
-        images = self.image['IALL']
+        labels = self.label['LAll']
+        texts = self.text['YAll']
+        images = self.image['IAll']
 
         all_img = []
 
