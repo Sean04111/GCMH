@@ -14,7 +14,7 @@ class TxtNet(nn.Module):
         self.alpha = 1.0
         self.dropout = nn.Dropout(p=0.5)
         self.relu = nn.ReLU(inplace = True)
-        torch.nn.init.normal(self.fc_encode.weight, mean=0.0, std= 0.3)  
+        torch.nn.init.normal_(self.fc_encode.weight, mean=0.0, std= 0.3)  
               
     def forward(self, x):
 
