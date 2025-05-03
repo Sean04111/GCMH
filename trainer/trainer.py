@@ -109,14 +109,10 @@ class Trainer:
 
         entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
         print("\n=== img 查询集 哈希码熵 分布 ===")
-        for i, H in enumerate(entropies):
-            print(f"Bit {i:2d}: Entropy = {H:.4f}")
         print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
         entropies = self.metricer.compute_bit_entropy(qu_HashCode_Txt)
         print("\n=== txt 查询集 哈希码熵 分布 ===")
-        for i, H in enumerate(entropies):
-            print(f"Bit {i:2d}: Entropy = {H:.4f}")
         print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
         mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True)
@@ -157,12 +153,12 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
 
-                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
+                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
                 self.opt_Img.zero_grad()
                 loss_img.backward(retain_graph=True)
                 self.opt_Img.step()
 
-                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
+                loss_txt = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()

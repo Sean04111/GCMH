@@ -85,7 +85,6 @@ class Metricer:
                 print(f"\n=== Query {iter} ===")
                 print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 print(f"Query Text: {self.qurey_raw_texts[iter]}")
-                print(f"Query HashCode: {query_HashCode[iter]}")
                 print("Top-20 Retrieval Results:")
                 for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:20], sorted_hamm[:20], sorted_gnd[:20])):
                     symbol = "✔" if is_pos else "✘"
@@ -110,7 +109,7 @@ class Metricer:
         mAP = total_ap / num_query
         return mAP, all_positive_samples
 
-    def compute_bit_entropy(hash_codes):
+    def compute_bit_entropy(self, hash_codes):
         """
         计算每一位哈希码的熵，输入为 shape [N, K]，N 是样本数，K 是哈希位数
         哈希值应该为 ±1
@@ -120,7 +119,7 @@ class Metricer:
         
         entropies = []
         for bit in range(binary_codes.shape[1]):
-            p = np.mean(binary_codes[:, bit])  # 这一位是 1 的概率
+            p = np.mean(binary_codes[:, bit])  # 是 1 的概率
             if p == 0 or p == 1:
                 entropy = 0.0
             else:
