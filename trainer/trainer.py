@@ -80,13 +80,13 @@ class Trainer:
         return S, distance_matrix, p
 
     def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I):
-        HashCode_Img = F.normalize(HashCode_Img)
-        HashCode_Txt = F.normalize(HashCode_Txt)
+        norm_HashCode_Img = F.normalize(HashCode_Img, dim=1)
+        norm_HashCode_Txt = F.normalize(HashCode_Txt, dim=1)
 
-        I_I = cosine_similarity(HashCode_Img, HashCode_Img)
-        T_T = cosine_similarity(HashCode_Txt, HashCode_Txt)
-        I_T = cosine_similarity(HashCode_Img, HashCode_Txt)
-        T_I = cosine_similarity(HashCode_Txt, HashCode_Img)
+        I_I = cosine_similarity(norm_HashCode_Img, norm_HashCode_Img)
+        T_T = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Txt)
+        I_T = cosine_similarity(norm_HashCode_Img, norm_HashCode_Txt)
+        T_I = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Img)
 
         diagonal = I_T.diagonal()
         all_1 = torch.rand(T_T.size(0)).fill_(1).cuda()
