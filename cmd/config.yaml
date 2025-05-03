@@ -1,5 +1,5 @@
 base_path: ../datasets/
-data_name: flickr8k
+data_name: flickr
 model_name: vgg19
 batch_size: 64
 bit: 64
@@ -20,4 +20,4 @@ dw: 1
 cw: 1
 K: 1.5
 KNN: 3000
-
+top_hamming: 5

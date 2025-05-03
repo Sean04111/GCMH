@@ -31,8 +31,6 @@ class Metricer:
         qu_BT = list([])
         qu_L = list([])
         for idx, (data_I, data_T, data_L, _,_) in enumerate(query_loader):
-            log("查询图像 : " + self.qurey_img_names[idx])
-            log("查询图像文本 : " + self.qurey_raw_texts[idx])
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -102,9 +100,9 @@ class Metricer:
 
         # 按汉明距离排序并输出前n个
         all_hamming_samples.sort(key=lambda x: x['hamming_distance'], reverse=True)
-        print("\n汉明距离最大的前{}个样本:".format(top_n))
+        print("\n汉明距离最大的前{}个样本:".format(self.config['top_n']))
         print("-" * 100)
-        for i, sample in enumerate(all_hamming_samples[:top_n]):
+        for i, sample in enumerate(all_hamming_samples[:self.config['top_n']]):
             print(f"排名 {i+1}:")
             print(f"查询图像: {sample['query_img_name']}")
             print(f"查询文本: {sample['query_text']}")
