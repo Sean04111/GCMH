@@ -1,7 +1,7 @@
 base_path: ../datasets/
-data_name: mini_nus
+data_name: nus
 model_name: vgg19
-batch_size: 10
+batch_size: 64
 bit: 64
 learning_rate: 0.05
 momentum: 0.9
@@ -19,5 +19,5 @@ possibility_scale: 4000
 dw: 1
 cw: 1
 K: 1.5
-KNN: 50
+KNN: 3000
 

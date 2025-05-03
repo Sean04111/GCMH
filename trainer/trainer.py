@@ -71,6 +71,8 @@ class Trainer:
 
         S = S * 2.0 - 1
 
+        log("Similarity matrix built.")
+
         return S, distance_matrix, p
 
     def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I):
@@ -145,6 +147,6 @@ class Trainer:
                 # 计算mAP
                 mAP_I2T, mAP_T2I = self._eval()
                 
-                if idx == len(self.train_loader) - 1:
+                if (idx + 1) % len(self.train_loader) == 0:
                     log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
             
