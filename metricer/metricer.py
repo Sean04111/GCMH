@@ -85,12 +85,13 @@ class Metricer:
                 print(f"\n=== Query {iter} ===")
                 print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 print(f"Query Text: {self.qurey_raw_texts[iter]}")
+                print(f"Query HashCode: {query_HashCode[iter]}")
                 print("Top-20 Retrieval Results:")
                 for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:20], sorted_hamm[:20], sorted_gnd[:20])):
                     symbol = "✔" if is_pos else "✘"
                     img_name = self.database_img_names[idx] if idx < len(self.database_img_names) else "unknown"
                     text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
-                    print(f"  Rank {rank+1:2d}: Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}, Match={symbol}")
+                    print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}")
 
             # 收集正样本信息
             for pos_idx in positive_indices:
