@@ -101,24 +101,10 @@ class Metricer:
             retrieval_indices = sample['retrieval_indices']
             hamming_distances = sample['hamming_distances']
             
-            # 获取查询样本
-            query_data = query_loader.dataset[query_idx]
-            query_img, query_txt, query_label, _ = query_data
-            
-            print(f"\n查询样本 {query_idx}:")
-            print(f"查询标签: {query_label}")
-            print(f"查询文本特征形状: {query_txt.shape}")
-            print(f"查询图像特征形状: {query_img.shape}")
-            
-            print("\n对应的检索样本:")
+            print(f"\n查询样本: query_{query_idx}")
+            print("对应的检索样本:")
             for i, (ret_idx, hamming_dist) in enumerate(zip(retrieval_indices, hamming_distances)):
                 if i >= 5:  # 只显示前5个
                     break
-                ret_data = database_loader.dataset[ret_idx]
-                ret_img, ret_txt, ret_label, _ = ret_data
-                print(f"\n检索样本 {ret_idx}:")
-                print(f"汉明距离: {hamming_dist:.4f}")
-                print(f"检索标签: {ret_label}")
-                print(f"检索文本特征形状: {ret_txt.shape}")
-                print(f"检索图像特征形状: {ret_img.shape}")
+                print(f"retrieval_{ret_idx} (汉明距离: {hamming_dist:.4f})")
             print("-" * 50)
