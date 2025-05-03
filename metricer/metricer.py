@@ -110,3 +110,24 @@ class Metricer:
         mAP = total_ap / num_query
         return mAP, all_positive_samples
 
+    def compute_bit_entropy(hash_codes):
+        """
+        计算每一位哈希码的熵，输入为 shape [N, K]，N 是样本数，K 是哈希位数
+        哈希值应该为 ±1
+        """
+        # 转换为 [0, 1] 表示（-1→0, +1→1）
+        binary_codes = (hash_codes > 0).astype(np.int32)  # shape: [N, K]
+        
+        entropies = []
+        for bit in range(binary_codes.shape[1]):
+            p = np.mean(binary_codes[:, bit])  # 这一位是 1 的概率
+            if p == 0 or p == 1:
+                entropy = 0.0
+            else:
+                entropy = -p * np.log2(p) - (1 - p) * np.log2(1 - p)
+            entropies.append(entropy)
+        
+        entropies = np.array(entropies)
+        return entropies
+
+

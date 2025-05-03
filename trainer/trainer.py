@@ -106,6 +106,19 @@ class Trainer:
     # 计算mAP@ALL
     def _eval(self):
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
+
+        entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
+        print("\n=== img 查询集 哈希码熵 分布 ===")
+        for i, H in enumerate(entropies):
+            print(f"Bit {i:2d}: Entropy = {H:.4f}")
+        print(f"Mean Entropy: {np.mean(entropies):.4f}")
+
+        entropies = self.metricer.compute_bit_entropy(qu_HashCode_Txt)
+        print("\n=== txt 查询集 哈希码熵 分布 ===")
+        for i, H in enumerate(entropies):
+            print(f"Bit {i:2d}: Entropy = {H:.4f}")
+        print(f"Mean Entropy: {np.mean(entropies):.4f}")
+
         mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True)
         mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True)
 
