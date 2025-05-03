@@ -25,8 +25,10 @@ class Trainer:
 
         train_imgs,train_txts,train_labels,_, _ = self.train_loader.dataset.get_all_data()
         _, _, _, self.query_img_names, self.query_raw_texts = self.query_loader.dataset.get_all_data()
+        _,_,_, self.database_img_names, self.database_raw_texts = self.database_loader.dataset.get_all_data()
+        
 
-        self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts)
+        self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts,database_img_names=self.database_img_names, database_raw_texts=self.database_raw_texts)
 
         train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
         train_txts = F.normalize(torch.Tensor(train_txts).cuda())

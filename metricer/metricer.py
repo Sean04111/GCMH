@@ -6,10 +6,12 @@ from utils.logger import log
 
 
 class Metricer:
-    def __init__(self, config, qurey_img_names, qurey_raw_texts):
+    def __init__(self, config, qurey_img_names, qurey_raw_texts,database_img_names, database_raw_texts):
         self.config = config
         self.qurey_img_names = qurey_img_names
         self.qurey_raw_texts = qurey_raw_texts
+        self.database_img_names = database_img_names
+        self.database_raw_texts = database_raw_texts
     
     def _compress(self, database_loader, query_loader, model_I, model_T):
         re_BI = list([])
@@ -86,7 +88,9 @@ class Metricer:
                 print("Top-20 Retrieval Results:")
                 for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:20], sorted_hamm[:20], sorted_gnd[:20])):
                     symbol = "✔" if is_pos else "✘"
-                    print(f"  Rank {rank+1:2d}: Index={idx:4d}, Hamming={h_dist:.1f}, Match={symbol}")
+                    img_name = self.database_img_names[idx] if idx < len(self.database_img_names) else "unknown"
+                    text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
+                    print(f"  Rank {rank+1:2d}: Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}, Match={symbol}")
 
             # 收集正样本信息
             for pos_idx in positive_indices:
