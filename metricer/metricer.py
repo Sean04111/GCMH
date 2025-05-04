@@ -17,7 +17,7 @@ class Metricer:
         re_BI = list([])
         re_BT = list([])
         re_L = list([])
-        for _, (data_I, data_T, data_L, _,_) in enumerate(database_loader):
+        for _, (data_I, data_T, data_L, _,_, _) in enumerate(database_loader):
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -32,7 +32,7 @@ class Metricer:
         qu_BI = list([])
         qu_BT = list([])
         qu_L = list([])
-        for idx, (data_I, data_T, data_L, _,_) in enumerate(query_loader):
+        for idx, (data_I, data_T, data_L, _,_, _) in enumerate(query_loader):
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -92,14 +92,6 @@ class Metricer:
                     text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
                     print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}")
 
-            # 收集正样本信息
-            for pos_idx in positive_indices:
-                all_positive_samples.append({
-                    'hamming_distance': hamm[pos_idx],
-                    'query_img_name': self.qurey_img_names[iter],
-                    'query_text': self.qurey_raw_texts[iter]
-                })
-
             # 计算 AP
             count = np.linspace(1, tsum, tsum)
             tindex = np.asarray(np.where(sorted_gnd == 1)) + 1.0
@@ -107,7 +99,7 @@ class Metricer:
             total_ap += ap
 
         mAP = total_ap / num_query
-        return mAP, all_positive_samples
+        return mAP
 
     def compute_bit_entropy(self, hash_codes):
         """

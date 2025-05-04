@@ -22,7 +22,7 @@ class BatchData(Dataset):
         label = self.labels[index]
         img_name = self.img_names[index]
         raw_text = self.raw_texts[index]
-        return image, text, label, img_name, raw_text
+        return image, text, label, img_name, raw_text, index
 
     def __len__(self):
         length = len(self.images)

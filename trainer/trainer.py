@@ -117,8 +117,8 @@ class Trainer:
         print("\n=== txt 查询集 哈希码熵 分布 ===")
         print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
-        mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
 
         return mAP_I2T, mAP_T2I
 
@@ -128,22 +128,19 @@ class Trainer:
         epoch_num = self.config['epoch_num']
         
         for epoch in range(epoch_num):
-            for idx, (img, txt, labels, img_name, raw_text) in enumerate(self.train_loader):
+            self.ImgNet.cuda().train()
+            self.TxtNet.cuda().train()
+            for idx, (img, txt, labels, img_name, raw_text, index) in enumerate(self.train_loader):
                 self.ImgNet.cuda().train()
                 self.TxtNet.cuda().train()
                 img = Variable(img).cuda()
                 txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
                 
-                # 获取当前批次中每个样本的全局索引
-                batch_indices = torch.arange(idx * self.config['batch_size'], 
-                                          min((idx + 1) * self.config['batch_size'], 
-                                              len(self.train_loader.dataset))).cuda()
-                
                 batch_size = img.size(0)
                 I = torch.eye(batch_size).cuda()
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
-                Sgc = self.Sgc[batch_indices, :][:, batch_indices].cuda()
+                Sgc = self.Sgc[index, :][:, index].cuda()
 
                 loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
 

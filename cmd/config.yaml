@@ -3,7 +3,7 @@ data_name: flickr
 model_name: vgg19
 batch_size: 64
 bit: 128
-learning_rate: 0.05
+learning_rate: 0.003
 momentum: 0.9
 weight_decay: 0.0005
 epoch_num: 100
