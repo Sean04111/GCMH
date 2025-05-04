@@ -1,4 +1,4 @@
-base_path: ../datasets/
+base_path: ../../datasets/
 data_name: flickr
 model_name: vgg19
 batch_size: 64

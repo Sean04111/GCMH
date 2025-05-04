@@ -105,6 +105,8 @@ class Trainer:
 
     # 计算mAP@ALL
     def _eval(self):
+        self.ImgNet.eval().cuda()
+        self.TxtNet.eval().cuda()
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
 
         entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
@@ -115,19 +117,20 @@ class Trainer:
         print("\n=== txt 查询集 哈希码熵 分布 ===")
         print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True)
-        mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True)
+        mAP_I2T, large_hamming_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_T2I, large_hamming_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
 
         return mAP_I2T, mAP_T2I
 
     # 自训练
     def train(self):
-        self.ImgNet.cuda().train()
-        self.TxtNet.cuda().train()
+ 
         epoch_num = self.config['epoch_num']
         
         for epoch in range(epoch_num):
             for idx, (img, txt, labels, img_name, raw_text) in enumerate(self.train_loader):
+                self.ImgNet.cuda().train()
+                self.TxtNet.cuda().train()
                 img = Variable(img).cuda()
                 txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
                 
@@ -146,7 +149,7 @@ class Trainer:
 
                 self.opt_Img.zero_grad()
                 self.opt_Txt.zero_grad()
-                loss.backward(retain_graph=True)
+                loss.backward()
                 self.opt_Img.step()
                 self.opt_Txt.step()
 
@@ -155,7 +158,7 @@ class Trainer:
 
                 loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
                 self.opt_Img.zero_grad()
-                loss_img.backward(retain_graph=True)
+                loss_img.backward()
                 self.opt_Img.step()
 
                 loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
@@ -164,7 +167,6 @@ class Trainer:
                 self.opt_Txt.step()
 
                 
-                if (idx + 1) % len(self.train_loader) == 0:
-                    mAP_I2T, mAP_T2I = self._eval()
-                    log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
+            mAP_I2T, mAP_T2I = self._eval()
+            log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
             
