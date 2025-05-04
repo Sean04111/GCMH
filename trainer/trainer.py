@@ -56,23 +56,41 @@ class Trainer:
         distance_weight = self.config['distance_weight']
         distance_matrix = (1-distance_weight) * images_self_similarity + distance_weight * texts_self_similarity
 
+        # 原本的Sgc矩阵的计算： Sgc = (1-possibility_weight) * d(Hi, Ht) + possibility_weight * p
+        # p = d(Hi, Ht) / sum(d(Hi, Ht))_knn
+
         # 基于k近邻计算两节点相似度
-        K = self.config['KNN']
-        distance_matrix_v2 = distance_matrix.clone()
-        m, n1 = distance_matrix_v2.sort()
-        k_rows = torch.arange(batch_size).view(-1,1).repeat(1, K).view(-1)
-        k_cols = n1[:, :K].contiguous().view(-1)
-        distance_matrix_v2[k_rows, k_cols] = 0.
+        KNN_layers = self.config['KNN_layers']
+        KNN_base = self.config['KNN_base']
+        KNN_gap = self.config['KNN_gap']
+        KNN_weight_base = self.config['KNN_weight_base']
+        KNN_weight_gap = self.config['KNN_weight_gap']
 
-        top_rows = torch.arange(batch_size).view(-1)
-        top_cols = n1[:, -1:].contiguous().view(-1)
-        distance_matrix_v2[top_rows, top_cols] = 0.
-
-        distance_matrix_v2 = distance_matrix_v2 / distance_matrix_v2.sum(1).view(-1,1)
-        p = cosine_similarity(distance_matrix_v2, distance_matrix_v2)
-
+        p = torch.empty_like(distance_matrix)
+        for layer in range(KNN_layers):
+            K = self.config['KNN']
+            K = KNN_base + layer * KNN_gap
+            KNN_weight = KNN_weight_base - layer * KNN_weight_gap
+                
+            distance_matrix_tmp = distance_matrix.clone()
+            m, n1 = distance_matrix_tmp.sort()
+            k_rows = torch.arange(batch_size).view(-1,1).repeat(1, K).view(-1)
+            k_cols = n1[:, :K].contiguous().view(-1)
+            distance_matrix_tmp[k_rows, k_cols] = 0.
+        
+            top_rows = torch.arange(batch_size).view(-1)
+            top_cols = n1[:, -1:].contiguous().view(-1)
+            distance_matrix_tmp[top_rows, top_cols] = 0.
+        
+            distance_matrix_tmp = distance_matrix_tmp / distance_matrix_tmp.sum(1).view(-1,1)
+            dump = cosine_similarity(distance_matrix_tmp, distance_matrix_tmp)
+    
+            p = p + KNN_weight * dump
+        # p = dump
+            
         S = (1-self.config['possibility_weight']) * distance_matrix + self.config['possibility_weight'] * self.config['possibility_scale'] * p
-
+        S = (S - S.min()) / (S.max() - S.min() + 1e-6) 
+        print("S stats:", S.min().item(), S.max().item(), S.mean().item())
         S = S * 2.0 - 1
 
         log("Similarity matrix built.")
