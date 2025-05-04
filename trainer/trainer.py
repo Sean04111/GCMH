@@ -109,18 +109,18 @@ class Trainer:
         self.TxtNet.eval().cuda()
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
 
-        entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
-        print("\n=== img 查询集 哈希码熵 分布 ===")
-        print(f"Mean Entropy: {np.mean(entropies):.4f}")
+        # entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
+        # print("\n=== img 查询集 哈希码熵 分布 ===")
+        # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        entropies = self.metricer.compute_bit_entropy(qu_HashCode_Txt)
-        print("\n=== txt 查询集 哈希码熵 分布 ===")
-        print(f"Mean Entropy: {np.mean(entropies):.4f}")
+        # entropies = self.metricer.compute_bit_entropy(qu_HashCode_Txt)
+        # print("\n=== txt 查询集 哈希码熵 分布 ===")
+        # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
-        mAP_T2I = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
 
-        return mAP_I2T, mAP_T2I
+        return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
     # 自训练
     def train(self):
@@ -164,6 +164,6 @@ class Trainer:
                 self.opt_Txt.step()
 
                 
-            mAP_I2T, mAP_T2I = self._eval()
-            log('Epoch: {}, Loss: {}, mAP_I2T: {}, mAP_T2I: {}'.format(epoch, loss, mAP_I2T, mAP_T2I))
+            mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval()
+            log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(epoch, loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
             

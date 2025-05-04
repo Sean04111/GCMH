@@ -81,12 +81,12 @@ class Metricer:
             sorted_hamm = hamm[sorted_indices]
 
             # 可选：打印排序列表及正负情况
-            if verbose:
+            if verbose and iter == num_query-1:
                 print(f"\n=== Query {iter} ===")
                 print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 print(f"Query Text: {self.qurey_raw_texts[iter]}")
-                print("Top-20 Retrieval Results:")
-                for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:20], sorted_hamm[:20], sorted_gnd[:20])):
+                print("Top-10 Retrieval Results:")
+                for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:10], sorted_hamm[:10], sorted_gnd[:10])):
                     symbol = "✔" if is_pos else "✘"
                     img_name = self.database_img_names[idx] if idx < len(self.database_img_names) else "unknown"
                     text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
@@ -99,7 +99,10 @@ class Metricer:
             total_ap += ap
 
         mAP = total_ap / num_query
-        return mAP
+
+        # 计算哈希码每一位熵均值
+        entropies = self.compute_bit_entropy(query_HashCode)
+        return mAP, np.mean(entropies)
 
     def compute_bit_entropy(self, hash_codes):
         """
