@@ -1,4 +1,5 @@
 base_path: ../../datasets/
+result_file_path: ../results/best_result.txt
 data_name: flickr
 model_name: vgg19
 batch_size: 64

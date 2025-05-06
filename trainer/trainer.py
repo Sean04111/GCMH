@@ -27,6 +27,8 @@ class Trainer:
         _, _, _, self.query_img_names, self.query_raw_texts = self.query_loader.dataset.get_all_data()
         _,_,_, self.database_img_names, self.database_raw_texts = self.database_loader.dataset.get_all_data()
 
+        self.best_mAP = 0.0
+
         # 
         if self.config['data_name'] == 'flickr':
             self.label_names = dataloader.label_names
@@ -139,6 +141,13 @@ class Trainer:
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
+    def _save_best_result(self, mAP_I2T, mAP_T2I):
+        best_result_file = self.config['result_file_path']
+        with open(best_result_file, 'w') as f:
+            f.write("config is "+ str(self.config.config) + "\n")
+            mAP_text = "best mAP_I2T : "  + str(mAP_I2T) + " best mAP_T2I : " + str(mAP_T2I)
+            f.write(mAP_text)
+
     # 自训练
     def train(self):
  
@@ -179,8 +188,11 @@ class Trainer:
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
-
-                
             mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval()
             log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(epoch, loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
+            if mAP_I2T + mAP_T2I > self.best_mAP:
+                log('logging the best score...')
+                self.best_mAP = mAP_I2T + mAP_T2I
+                self._save_best_result(mAP_I2T, mAP_T2I)
+                
             
