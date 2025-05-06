@@ -82,16 +82,16 @@ class Metricer:
             sorted_hamm = hamm[sorted_indices]
 
             # 可选：打印排序列表及正负情况
-            if verbose and iter == num_query-1:
+            if verbose and iter == num_query-1 and query_type=='img':
                 print(f"\n=== Query {iter} ===")
                 if query_type == 'img':
                     print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 elif query_type == 'txt':
                     print(f"Query Text: {self.qurey_raw_texts[iter]}")
                     # 打印当前查询的标签
+                print(f"Query Hash Code : {query_HashCode[iter].tolist()}")
                 query_labels = query_Label[iter]
                 print(f"Query Labels (ID): {query_labels}")
-                
                 # 将标签 ID 转换为标签名称并打印
                 query_label_names = [self.label_names[i] for i in range(len(query_labels)) if query_labels[i] == 1]
                 print(f"Query Labels (Names): {query_label_names}")
@@ -106,7 +106,7 @@ class Metricer:
                     shared_label_indices = np.where((query_labels * retrieved_labels) > 0)[0]
                     shared_labels = shared_label_indices.tolist()
                     # 修改打印共享标签的部分
-                    print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}, Shared Labels=", end="")
+                    print(f"  Rank {rank+1:2d}: Match={symbol}, Text={text:15s}, Hamming={h_dist:.1f}, Shared Labels=", end="")
                     for label_idx in shared_labels:
                         print(self.label_names[label_idx], end=" ")  # 逐个输出共有标签的名称
                     print()  # 换行

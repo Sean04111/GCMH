@@ -23,8 +23,8 @@ top_hamming: 5
 KNN: 3000
 
 # build multi KNN
-KNN_layers: 10
+KNN_layers: 30
 KNN_base: 2000
 KNN_gap: 100
 KNN_weight_base: 0.6
-KNN_weight_gap: 0.1
+KNN_weight_gap: 0.05
