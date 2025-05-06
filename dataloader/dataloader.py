@@ -96,13 +96,21 @@ class CustomDataLoader:
         elif self.config['data_name'] == 'flickr':
             #  load img_names and raw_texts
             img_names = np.load(base_path + 'img_names.npy')
+
+            query_img_names = img_names[test_num]
+            database_img_names = img_names[database_num]
+            
             raw_texts = np.load(base_path + 'raw_texts.npy')
+
+            query_raw_texts = raw_texts[test_num]
+            database_raw_texts = raw_texts[database_num]
+            self.label_names = np.load(base_path + 'label_names.npy')
 
             dataset = {
                 'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = img_names, raw_texts = raw_texts),
-                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = img_names, raw_texts = raw_texts),
+                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = query_img_names, raw_texts = query_raw_texts),
                 'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = img_names, raw_texts = raw_texts),
-                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = img_names, raw_texts = raw_texts),    
+                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = database_img_names, raw_texts = database_raw_texts),    
             }
 
         self.dataloaders = {

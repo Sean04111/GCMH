@@ -26,9 +26,16 @@ class Trainer:
         train_imgs,train_txts,train_labels,_, _ = self.train_loader.dataset.get_all_data()
         _, _, _, self.query_img_names, self.query_raw_texts = self.query_loader.dataset.get_all_data()
         _,_,_, self.database_img_names, self.database_raw_texts = self.database_loader.dataset.get_all_data()
-        
 
-        self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts,database_img_names=self.database_img_names, database_raw_texts=self.database_raw_texts)
+        # 
+        if self.config['data_name'] == 'flickr':
+            self.label_names = dataloader.label_names
+            log(str(self.label_names))
+        else:
+            # 非flickr数据集可能会有bug，后期兼容一下
+            self.label_names = {}
+
+        self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts,database_img_names=self.database_img_names, database_raw_texts=self.database_raw_texts, label_names=self.label_names)
 
         train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
         train_txts = F.normalize(torch.Tensor(train_txts).cuda())
@@ -127,16 +134,8 @@ class Trainer:
         self.TxtNet.eval().cuda()
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
 
-        # entropies = self.metricer.compute_bit_entropy(qu_HashCode_Img)
-        # print("\n=== img 查询集 哈希码熵 分布 ===")
-        # print(f"Mean Entropy: {np.mean(entropies):.4f}")
-
-        # entropies = self.metricer.compute_bit_entropy(qu_HashCode_Txt)
-        # print("\n=== txt 查询集 哈希码熵 分布 ===")
-        # print(f"Mean Entropy: {np.mean(entropies):.4f}")
-
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True, query_type='img')
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True, query_type='txt')
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 

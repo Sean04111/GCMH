@@ -6,12 +6,13 @@ from utils.logger import log
 
 
 class Metricer:
-    def __init__(self, config, qurey_img_names, qurey_raw_texts,database_img_names, database_raw_texts):
+    def __init__(self, config, qurey_img_names, qurey_raw_texts,database_img_names, database_raw_texts, label_names={}):
         self.config = config
         self.qurey_img_names = qurey_img_names
         self.qurey_raw_texts = qurey_raw_texts
         self.database_img_names = database_img_names
         self.database_raw_texts = database_raw_texts
+        self.label_names = label_names
     
     def _compress(self, database_loader, query_loader, model_I, model_T):
         re_BI = list([])
@@ -58,7 +59,7 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, verbose=False):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, query_type, verbose=False):
         num_query = query_Label.shape[0]
         total_ap = 0
 
@@ -83,14 +84,32 @@ class Metricer:
             # 可选：打印排序列表及正负情况
             if verbose and iter == num_query-1:
                 print(f"\n=== Query {iter} ===")
-                print(f"Query Image Name: {self.qurey_img_names[iter]}")
-                print(f"Query Text: {self.qurey_raw_texts[iter]}")
+                if query_type == 'img':
+                    print(f"Query Image Name: {self.qurey_img_names[iter]}")
+                elif query_type == 'txt':
+                    print(f"Query Text: {self.qurey_raw_texts[iter]}")
+                    # 打印当前查询的标签
+                query_labels = query_Label[iter]
+                print(f"Query Labels (ID): {query_labels}")
+                
+                # 将标签 ID 转换为标签名称并打印
+                query_label_names = [self.label_names[i] for i in range(len(query_labels)) if query_labels[i] == 1]
+                print(f"Query Labels (Names): {query_label_names}")
                 print("Top-10 Retrieval Results:")
                 for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:10], sorted_hamm[:10], sorted_gnd[:10])):
                     symbol = "✔" if is_pos else "✘"
                     img_name = self.database_img_names[idx] if idx < len(self.database_img_names) else "unknown"
                     text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
-                    print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}")
+                    
+                    query_labels = query_Label[iter]
+                    retrieved_labels = retrieval_Label[idx]
+                    shared_label_indices = np.where((query_labels * retrieved_labels) > 0)[0]
+                    shared_labels = shared_label_indices.tolist()
+                    # 修改打印共享标签的部分
+                    print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}, Shared Labels=", end="")
+                    for label_idx in shared_labels:
+                        print(self.label_names[label_idx], end=" ")  # 逐个输出共有标签的名称
+                    print()  # 换行
 
             # 计算 AP
             count = np.linspace(1, tsum, tsum)
