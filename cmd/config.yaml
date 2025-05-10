@@ -1,5 +1,5 @@
 base_path: ../../datasets/
-result_file_path: ../results/best_result.txt
+result_path: ../results/
 data_name: flickr
 model_name: vgg19
 batch_size: 64
@@ -24,8 +24,8 @@ top_hamming: 5
 KNN: 3000
 
 # build multi KNN
-KNN_layers: 3
-KNN_base: 3000
-KNN_gap: 1000
-KNN_weight_base: 0.6
+KNN_layers: 5
+KNN_base: 600
+KNN_gap: 600
+KNN_weight_base: 0.4
 KNN_weight_gap: 0.1

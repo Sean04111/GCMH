@@ -10,6 +10,7 @@ from models.ImgNet import ImgNet
 from models.TxtNet import TxtNet
 from metricer.metricer import Metricer
 from utils.logger import log
+import datetime
 
 
 
@@ -28,7 +29,9 @@ class Trainer:
         _,_,_, self.database_img_names, self.database_raw_texts = self.database_loader.dataset.get_all_data()
 
         self.best_mAP = 0.0
-
+        current_time = datetime.datetime.now()
+        formatted_time = current_time.strftime("%Y%m%d_%H%M%S")
+        self.save_file_name = self.config['result_path'] + formatted_time + '.txt'
         # 
         if self.config['data_name'] == 'flickr':
             self.label_names = dataloader.label_names
@@ -75,7 +78,7 @@ class Trainer:
         KNN_weight_base = self.config['KNN_weight_base']
         KNN_weight_gap = self.config['KNN_weight_gap']
 
-        p = torch.empty_like(distance_matrix)
+        p = torch.zeros_like(distance_matrix)
         for layer in range(KNN_layers):
             K = self.config['KNN']
             K = KNN_base + layer * KNN_gap
@@ -91,14 +94,15 @@ class Trainer:
             top_cols = n1[:, -1:].contiguous().view(-1)
             distance_matrix_tmp[top_rows, top_cols] = 0.
         
-            distance_matrix_tmp = distance_matrix_tmp / distance_matrix_tmp.sum(1).view(-1,1)
+            distance_matrix_tmp = distance_matrix_tmp / (distance_matrix_tmp.sum(1).view(-1, 1) + 1e-6)  # 避免分母为0
             dump = cosine_similarity(distance_matrix_tmp, distance_matrix_tmp)
     
             p = p + KNN_weight * dump
+            
         # p = dump
             
         S = (1-self.config['possibility_weight']) * distance_matrix + self.config['possibility_weight'] * self.config['possibility_scale'] * p
-        S = (S - S.min()) / (S.max() - S.min() + 1e-6) 
+        # S = (S - S.min()) / (S.max() - S.min() + 1e-6) 
         print("S stats:", S.min().item(), S.max().item(), S.mean().item())
         S = S * 2.0 - 1
 
@@ -136,14 +140,13 @@ class Trainer:
         self.TxtNet.eval().cuda()
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
 
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True, query_type='img')
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=True, query_type='txt')
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False, query_type='img')
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False, query_type='txt')
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
     def _save_best_result(self, mAP_I2T, mAP_T2I):
-        best_result_file = self.config['result_file_path']
-        with open(best_result_file, 'w') as f:
+        with open(self.save_file_name, 'w') as f:
             f.write("config is "+ str(self.config.config) + "\n")
             mAP_text = "best mAP_I2T : "  + str(mAP_I2T) + " best mAP_T2I : " + str(mAP_T2I)
             f.write(mAP_text)
