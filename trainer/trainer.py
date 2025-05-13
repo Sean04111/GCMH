@@ -11,6 +11,7 @@ from models.TxtNet import TxtNet
 from metricer.metricer import Metricer
 import datetime
 from utils.logger import log
+from tqdm import tqdm 
 import datetime
 
 
@@ -159,48 +160,58 @@ class Trainer:
 
     # 自训练
     def train(self):
- 
         epoch_num = self.config['epoch_num']
-        
+    
         for epoch in range(epoch_num):
             self.ImgNet.cuda().train()
             self.TxtNet.cuda().train()
-            for idx, (img, txt, labels, img_name, raw_text, index) in enumerate(self.train_loader):
-                self.ImgNet.cuda().train()
-                self.TxtNet.cuda().train()
+            total_loss = 0.0
+    
+            pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), desc=f"Epoch {epoch+1}/{epoch_num}")
+            for idx, data in pbar:
+                if self.config['data_name'] == 'flickr':
+                    img, txt, labels, img_name, raw_text, index = data
+                else:
+                    img, txt, labels, index = data
+    
                 img = Variable(img).cuda()
                 txt = Variable(torch.FloatTensor(txt.numpy())).cuda()
-                
+    
                 batch_size = img.size(0)
                 I = torch.eye(batch_size).cuda()
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
                 Sgc = self.Sgc[index, :][:, index].cuda()
-
+    
                 loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
-
+    
                 self.opt_Img.zero_grad()
                 self.opt_Txt.zero_grad()
                 loss.backward()
                 self.opt_Img.step()
                 self.opt_Txt.step()
-
+    
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
-
+    
                 loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
-
+    
                 loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
-
-
+    
+                total_loss += loss.item()
+                avg_loss = total_loss / (idx + 1)
+                pbar.set_postfix(loss=f"{avg_loss:.4f}")
+    
             mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval()
-            log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(epoch, loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
+            log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
+                epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
+    
             if mAP_I2T + mAP_T2I > self.best_mAP:
                 log('logging the best score...')
                 self.best_mAP = mAP_I2T + mAP_T2I

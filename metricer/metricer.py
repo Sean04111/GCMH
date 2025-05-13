@@ -18,7 +18,12 @@ class Metricer:
         re_BI = list([])
         re_BT = list([])
         re_L = list([])
-        for _, (data_I, data_T, data_L, _,_, _) in enumerate(database_loader):
+        for _, data in enumerate(database_loader):
+
+            if self.config['data_name'] == 'flickr':
+               data_I, data_T, data_L, _,_, _ = data
+            else:
+                data_I, data_T, data_L, _ = data
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
@@ -33,7 +38,13 @@ class Metricer:
         qu_BI = list([])
         qu_BT = list([])
         qu_L = list([])
-        for idx, (data_I, data_T, data_L, _,_, _) in enumerate(query_loader):
+        for idx, data in enumerate(query_loader):
+
+            if self.config['data_name'] == 'flickr':
+                data_I, data_T, data_L, _,_, _ = data
+            else:
+                data_I, data_T, data_L, _ = data
+            
             with torch.no_grad():
                 var_data_I = Variable(data_I.cuda())
                 _, code_I = model_I(var_data_I)
