@@ -20,9 +20,12 @@ class BatchData(Dataset):
         image = self.images[index]
         text = self.texts[index]
         label = self.labels[index]
-        img_name = self.img_names[index]
-        raw_text = self.raw_texts[index]
-        return image, text, label, img_name, raw_text, index
+        if self.img_names != {} and self.raw_texts != {}:
+            img_name = self.img_names[index]
+            raw_text = self.raw_texts[index]
+            return image, text, label, img_name, raw_text, index
+        else:
+            return image, text, label, index
 
     def __len__(self):
         length = len(self.images)

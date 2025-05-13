@@ -1,6 +1,6 @@
 base_path: ../../datasets/
 result_path: ../results/
-data_name: flickr
+data_name: nus
 model_name: vgg19
 batch_size: 64
 bit: 128
