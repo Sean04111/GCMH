@@ -28,8 +28,8 @@ eval_epoch: 0
 # 使用Sgc来指导正负样本的区分的阈值：
 # > PP_threshold ： PP， 正样本
 # < NP_threshold : NP, 负样本
-PP_threshold: 0.7
-NP_threshold: 0.35
+PP_threshold: 0.6
+NP_threshold: 0.6
 
 temperature: 0.7
-infoNCE_weight: 0.1
+infoNCE_weight: 1.0

@@ -133,7 +133,7 @@ class Metricer:
         mean_entropy = entropies.mean().item()
     
         # === 查询热度图（使用 CPU） ===
-        if verbose and epoch_num > 20 and outdata_type == 'heat':
+        if verbose and epoch_num > 50 and outdata_type == 'heat':
             log("retrivel result gen start")
             query_scores = []
     
@@ -168,7 +168,7 @@ class Metricer:
             plt.close()
     
         # === 绘制 PR 曲线（仍使用 CPU） ===
-        if verbose and epoch_num > 20 and outdata_type == 'pr':
+        if verbose and epoch_num > 50 and outdata_type == 'pr':
             log('绘制pr曲线...')
             interpolated_recalls = np.linspace(0, 1, 100)
             interpolated_precisions = []
