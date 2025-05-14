@@ -111,7 +111,7 @@ class Trainer:
         return loss
 
     # 计算mAP@ALL
-    def _eval(self):
+    def _eval(self, epoch_num):
         self.ImgNet.eval().cuda()
         self.TxtNet.eval().cuda()
         re_HashCode_Img, re_HashCode_Txt, re_Label, qu_HashCode_Img, qu_HashCode_Txt, qu_Label = self.metricer._compress(self.database_loader, self.query_loader, self.ImgNet, self.TxtNet)
@@ -124,8 +124,8 @@ class Trainer:
         # print("\n=== txt 查询集 哈希码熵 分布 ===")
         # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,verbose=False)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img', verbose=True)
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', verbose=True)
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
@@ -146,7 +146,7 @@ class Trainer:
     
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), desc=f"Epoch {epoch+1}/{epoch_num}")
             for idx, data in pbar:
-                if self.config['data_name'] == 'flickr':
+                if self.config['data_name'] == 'old_flickr':
                     img, txt, labels, img_name, raw_text, index = data
                 else:
                     img, txt, labels, index = data
@@ -184,13 +184,15 @@ class Trainer:
                 total_loss += loss.item()
                 avg_loss = total_loss / (idx + 1)
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
-    
-            mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval()
-            log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
-                epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
-    
-            if mAP_I2T + mAP_T2I > self.best_mAP:
-                log('logging the best score...')
-                self.best_mAP = mAP_I2T + mAP_T2I
-                self._save_best_result(mAP_I2T, mAP_T2I)
+
+            
+            if epoch >= self.config['eval_epoch']:
+                mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval(epoch)
+                log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
+                    epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
+        
+                if mAP_I2T + mAP_T2I > self.best_mAP:
+                    log('logging the best score...')
+                    self.best_mAP = mAP_I2T + mAP_T2I
+                    self._save_best_result(mAP_I2T, mAP_T2I)
             

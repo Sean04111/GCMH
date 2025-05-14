@@ -1,8 +1,11 @@
 import torch
 import numpy as np
 from torch.autograd import Variable
-
 from utils.logger import log
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
+from tqdm import tqdm
 
 
 class Metricer:
@@ -19,7 +22,7 @@ class Metricer:
         re_L = list([])
         for _, data in enumerate(database_loader):
 
-            if self.config['data_name'] == 'flickr':
+            if self.config['data_name'] == 'old_flickr':
                data_I, data_T, data_L, _,_, _ = data
             else:
                 data_I, data_T, data_L, _ = data
@@ -39,7 +42,7 @@ class Metricer:
         qu_L = list([])
         for idx, data in enumerate(query_loader):
 
-            if self.config['data_name'] == 'flickr':
+            if self.config['data_name'] == 'old_flickr':
                 data_I, data_T, data_L, _,_, _ = data
             else:
                 data_I, data_T, data_L, _ = data
@@ -69,7 +72,7 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, verbose=False):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, epoch_num ,query_type, verbose=False):
         num_query = query_Label.shape[0]
         total_ap = 0
 
@@ -92,7 +95,7 @@ class Metricer:
             sorted_hamm = hamm[sorted_indices]
 
             # 可选：打印排序列表及正负情况
-            if verbose and iter == num_query-1:
+            if verbose and iter == num_query-1 and self.config['data_name'] == 'old_flickr':
                 print(f"\n=== Query {iter} ===")
                 print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 print(f"Query Text: {self.qurey_raw_texts[iter]}")
@@ -113,6 +116,43 @@ class Metricer:
 
         # 计算哈希码每一位熵均值
         entropies = self.compute_bit_entropy(query_HashCode)
+
+        if verbose and epoch_num > 20:
+            log("retrivel result gen start")
+            
+            query_scores = []
+            for iter in tqdm(range(num_query), desc="Computing query heat scores"):
+                gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
+                if np.sum(gnd) == 0:
+                    query_scores.append(0.0)
+                    continue
+    
+                hamm = self.calculate_hamming(query_HashCode[iter, :], retrieval_HashCode)
+                sorted_indices = np.argsort(hamm)
+    
+                score = 0.0
+                for rank, db_idx in enumerate(sorted_indices):
+                    overlap = np.sum(query_Label[iter] * retrieval_Label[db_idx])
+                    score += overlap / (rank + 1)  # 越靠前权重越高
+                query_scores.append(score)
+    
+            query_scores = np.array(query_scores)
+            query_scores = (query_scores - np.min(query_scores)) / (np.max(query_scores) - np.min(query_scores) + 1e-10)
+    
+            # === 可视化：将 query_HashCode 降维后散点图展示 ===
+  
+            reduced = TSNE(n_components=2, random_state=0).fit_transform(query_HashCode)
+    
+            plt.figure(figsize=(8, 6))
+            plt.scatter(reduced[:, 0], reduced[:, 1], c=query_scores, cmap='hot_r', s=35)
+            plt.colorbar(label="Query Heat Score")
+            plt.title("Query Result Hotness Visualization (Red = Better)")
+            plt.tight_layout()
+            plt.savefig("query_heatmap_" + query_type + ".png")
+            plt.close()
+
+
+        
         return mAP, np.mean(entropies)
 
     def compute_bit_entropy(self, hash_codes):
@@ -134,5 +174,11 @@ class Metricer:
         
         entropies = np.array(entropies)
         return entropies
+
+
+
+
+
+
 
 

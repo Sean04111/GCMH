@@ -20,7 +20,7 @@ class BatchData(Dataset):
         image = self.images[index]
         text = self.texts[index]
         label = self.labels[index]
-        if self.img_names != {} and self.raw_texts != {}:
+        if len(self.img_names)!=0 and len(self.raw_texts) !=0 :
             img_name = self.img_names[index]
             raw_text = self.raw_texts[index]
             return image, text, label, img_name, raw_text, index
@@ -87,25 +87,25 @@ class CustomDataLoader:
         database_texts = tags[database_num]
         database_labels = label[database_num]
 
-        # todo: 后续看下database_v
-
-        if self.config['data_name'] == 'nus':
-            dataset = {
-                'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = {}, raw_texts = {}),
-                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = {}, raw_texts = {}),
-                'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = {}, raw_texts = {}),
-                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = {}, raw_texts = {}),
-            }
-        elif self.config['data_name'] == 'flickr':
+        # todo: 后续看下database_v            
+        if self.config['data_name'] == 'old_flickr':
             #  load img_names and raw_texts
             img_names = np.load(base_path + 'img_names.npy')
             raw_texts = np.load(base_path + 'raw_texts.npy')
-
+  
+    
             dataset = {
                 'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = img_names, raw_texts = raw_texts),
                 'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = img_names, raw_texts = raw_texts),
                 'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = img_names, raw_texts = raw_texts),
                 'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = img_names, raw_texts = raw_texts),    
+            }
+        else:
+            dataset = {
+                'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = {}, raw_texts = {}),
+                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = {}, raw_texts = {}),
+                'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = {}, raw_texts = {}),
+                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = {}, raw_texts = {}),
             }
 
         self.dataloaders = {
