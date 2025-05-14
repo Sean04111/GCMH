@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 from config.config import Config
 from dataloader.dataloader import CustomDataLoader
-from utils.similarity import cosine_similarity
+from utils.similarity import cosine_similarity, plot_sgc_distribution
 from models.ImgNet import ImgNet
 from models.TxtNet import TxtNet
 from metricer.metricer import Metricer
@@ -42,6 +42,8 @@ class Trainer:
         train_labels = torch.Tensor(train_labels).cuda()
 
         self.Sgc, self.distance_matrix, self.possibility_matrix = self._build_similarity_matrix(train_imgs, train_txts)
+        # 复原Sgc，用于infoNCE
+        self.Sgc_raw = (self.Sgc + 1) / 2
 
         txt_feat_len = train_txts.size(1)
         self.ImgNet = ImgNet(code_len=self.config['bit'], txt_feat_len=txt_feat_len)
@@ -108,7 +110,40 @@ class Trainer:
 
         loss = loss_pair + (loss_dis_1 + loss_dis_2 + loss_dis_3 ) * self.config['dw'] + loss_cons * self.config['cw']
 
+
+
         return loss
+
+    def _infoNCE_cal(self, h_img, h_txt, sgc, temperature=0.07, pos_thresh=0.6, neg_thresh=0.3):
+        """
+        多正样本引导的 InfoNCE 损失
+        """
+        B = h_img.shape[0]
+        h_img = F.normalize(h_img, dim=1)
+        h_txt = F.normalize(h_txt, dim=1)
+    
+        # 相似度矩阵 [B, B]
+        sim_i2t = torch.matmul(h_img, h_txt.T) / temperature  # [B, B]
+        sim_t2i = sim_i2t.T
+    
+        # === 构建正样本掩码 ===
+        pos_mask = (sgc > pos_thresh).float()  # [B, B]
+        pos_mask.fill_diagonal_(1.0)  # 自己永远是正样本
+    
+        # normalize 每行为一个正样本概率分布
+        pos_weight_i2t = pos_mask / (pos_mask.sum(dim=1, keepdim=True) + 1e-8)
+        pos_weight_t2i = pos_mask.T / (pos_mask.T.sum(dim=1, keepdim=True) + 1e-8)
+    
+        # log-softmax over similarity
+        log_prob_i2t = F.log_softmax(sim_i2t, dim=1)
+        log_prob_t2i = F.log_softmax(sim_t2i, dim=1)
+    
+        # KL-divergence with soft label
+        loss_i2t = F.kl_div(log_prob_i2t, pos_weight_i2t, reduction='batchmean')
+        loss_t2i = F.kl_div(log_prob_t2i, pos_weight_t2i, reduction='batchmean')
+    
+        return (loss_i2t + loss_t2i) / 2
+
 
     # 计算mAP@ALL
     def _eval(self, epoch_num):
@@ -124,8 +159,8 @@ class Trainer:
         # print("\n=== txt 查询集 哈希码熵 分布 ===")
         # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img',outdata_type = 'heat', verbose=True)
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', outdata_type='heat', verbose=True)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img',outdata_type = 'pr', verbose=True)
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', outdata_type='pr', verbose=True)
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
@@ -159,9 +194,11 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
                 Sgc = self.Sgc[index, :][:, index].cuda()
+                Sgc_raw = self.Sgc_raw[index, :][:, index].cuda()
     
                 loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
-    
+                infoNCE_loss = self._infoNCE_cal(HashCode_Img, HashCode_Txt, Sgc_raw, self.config['temperature'], self.config['PP_threshold'], self.config['NP_threshold'])
+                loss = loss + self.config['infoNCE_weight'] * infoNCE_loss
                 self.opt_Img.zero_grad()
                 self.opt_Txt.zero_grad()
                 loss.backward()
@@ -172,25 +209,35 @@ class Trainer:
                 _, HashCode_Txt = self.TxtNet(txt)
     
                 loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
+                info_loss_img = self._infoNCE_cal(HashCode_Img, HashCode_Txt.detach(), Sgc_raw,
+                                  temperature=self.config['temperature'],
+                                  pos_thresh=self.config['PP_threshold'],
+                                  neg_thresh=self.config['NP_threshold'])
+                loss_img = loss_img + self.config['infoNCE_weight'] * info_loss_img
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
     
                 loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
+                info_loss_txt = self._infoNCE_cal(HashCode_Img.detach(), HashCode_Txt, Sgc_raw,
+                                  temperature=self.config['temperature'],
+                                  pos_thresh=self.config['PP_threshold'],
+                                  neg_thresh=self.config['NP_threshold'])
+                loss_txt = loss_txt + self.config['infoNCE_weight'] * info_loss_txt
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
+
     
                 total_loss += loss.item()
                 avg_loss = total_loss / (idx + 1)
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
 
-            
+                # print(f"Epoch {epoch} | hash_loss={loss.item():.4f} | info_loss={infoNCE_loss.item():.4f}")
+                
             if epoch >= self.config['eval_epoch']:
                 mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval(epoch)
-                log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
-                    epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
-        
+                log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
                 if mAP_I2T + mAP_T2I > self.best_mAP:
                     log('logging the best score...')
                     self.best_mAP = mAP_I2T + mAP_T2I

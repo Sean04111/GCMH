@@ -22,5 +22,14 @@ cw: 1
 K: 1.5
 KNN: 3000
 top_hamming: 5
-eval_interval: 100
-eval_epoch: 60
+eval_interval: 10
+eval_epoch: 50
+
+# 使用Sgc来指导正负样本的区分的阈值：
+# > PP_threshold ： PP， 正样本
+# < NP_threshold : NP, 负样本
+PP_threshold: 0.7
+NP_threshold: 0.35
+
+temperature: 0.7
+infoNCE_weight: 0.1
