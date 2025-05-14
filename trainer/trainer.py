@@ -124,8 +124,8 @@ class Trainer:
         # print("\n=== txt 查询集 哈希码熵 分布 ===")
         # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img', verbose=True)
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', verbose=True)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img',outdata_type = 'heat', verbose=True)
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', outdata_type='heat', verbose=True)
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 

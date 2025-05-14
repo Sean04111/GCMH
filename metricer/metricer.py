@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+
 
 
 class Metricer:
@@ -72,54 +74,52 @@ class Metricer:
         distH = 0.5 * (leng - np.dot(B1, B2.transpose()))
         return distH
 
-    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, epoch_num ,query_type, verbose=False):
+    def eval_mAP_all(self, query_HashCode, retrieval_HashCode, query_Label, retrieval_Label, epoch_num ,query_type, outdata_type, verbose=False):
         num_query = query_Label.shape[0]
         total_ap = 0
-
-        all_positive_samples = []
-
+    
+        all_sorted_gnds = []  # 用于 PR 曲线
+        max_recall_length = 0
+    
         for iter in range(num_query):
             gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
             tsum = int(np.sum(gnd))
             if tsum == 0:
                 continue
-
+    
             hamm = self.calculate_hamming(query_HashCode[iter, :], retrieval_HashCode)
-
-            # 正样本索引
-            positive_indices = np.where(gnd == 1)[0]
-
-            # 排序索引（从小到大）
+    
             sorted_indices = np.argsort(hamm)
             sorted_gnd = gnd[sorted_indices]
-            sorted_hamm = hamm[sorted_indices]
-
-            # 可选：打印排序列表及正负情况
+            max_recall_length = max(max_recall_length, int(np.sum(sorted_gnd)))
+            all_sorted_gnds.append(sorted_gnd)
+    
+            # 打印正负样本详情
             if verbose and iter == num_query-1 and self.config['data_name'] == 'old_flickr':
                 print(f"\n=== Query {iter} ===")
                 print(f"Query Image Name: {self.qurey_img_names[iter]}")
                 print(f"Query Text: {self.qurey_raw_texts[iter]}")
                 print("Top-10 Retrieval Results:")
-                for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:10], sorted_hamm[:10], sorted_gnd[:10])):
+                for rank, (idx, h_dist, is_pos) in enumerate(zip(sorted_indices[:10], hamm[sorted_indices[:10]], sorted_gnd[:10])):
                     symbol = "✔" if is_pos else "✘"
                     img_name = self.database_img_names[idx] if idx < len(self.database_img_names) else "unknown"
                     text = self.database_raw_texts[idx] if idx < len(self.database_raw_texts) else "unknown"
                     print(f"  Rank {rank+1:2d}: Match={symbol} Image={img_name:15s}, Text={text:15s}, Hamming={h_dist:.1f}")
-
-            # 计算 AP
+    
+            # AP 计算
             count = np.linspace(1, tsum, tsum)
             tindex = np.asarray(np.where(sorted_gnd == 1)) + 1.0
             ap = np.mean(count / (tindex))
             total_ap += ap
-
+    
         mAP = total_ap / num_query
-
-        # 计算哈希码每一位熵均值
+        # === 计算哈希码熵 ===
         entropies = self.compute_bit_entropy(query_HashCode)
-
-        if verbose and epoch_num > 20:
-            log("retrivel result gen start")
+    
+        if verbose and epoch_num > 20 and outdata_type == 'heat' :
+            # === 查询热度图可视化（原有代码保留） ===
             
+            log("retrivel result gen start")
             query_scores = []
             for iter in tqdm(range(num_query), desc="Computing query heat scores"):
                 gnd = (np.dot(query_Label[iter, :], retrieval_Label.transpose()) > 0).astype(np.float32)
@@ -133,14 +133,12 @@ class Metricer:
                 score = 0.0
                 for rank, db_idx in enumerate(sorted_indices):
                     overlap = np.sum(query_Label[iter] * retrieval_Label[db_idx])
-                    score += overlap / (rank + 1)  # 越靠前权重越高
+                    score += overlap / (rank + 1)
                 query_scores.append(score)
     
             query_scores = np.array(query_scores)
             query_scores = (query_scores - np.min(query_scores)) / (np.max(query_scores) - np.min(query_scores) + 1e-10)
     
-            # === 可视化：将 query_HashCode 降维后散点图展示 ===
-  
             reduced = TSNE(n_components=2, random_state=0).fit_transform(query_HashCode)
     
             plt.figure(figsize=(8, 6))
@@ -151,9 +149,41 @@ class Metricer:
             plt.savefig("query_heatmap_" + query_type + ".png")
             plt.close()
 
-
+        if verbose and epoch_num > 20 and outdata_type == 'pr':
+            # === 绘制 PR 曲线 ===
+            log('绘制pr曲线...')
+            interpolated_recalls = np.linspace(0, 1, 100)
+            interpolated_precisions = []
         
+            for sorted_gnd in tqdm(all_sorted_gnds):
+                precisions = []
+                recalls = []
+                tp = 0
+                total_pos = np.sum(sorted_gnd)
+                for i, rel in enumerate(sorted_gnd):
+                    if rel == 1:
+                        tp += 1
+                    precision = tp / (i + 1)
+                    recall = tp / (total_pos + 1e-10)
+                    precisions.append(precision)
+                    recalls.append(recall)
+                # 插值到标准 recall 点（避免长度不同）
+                interpolated = np.interp(interpolated_recalls, recalls, precisions, left=precisions[0], right=precisions[-1])
+                interpolated_precisions.append(interpolated)
+        
+            avg_precision = np.mean(interpolated_precisions, axis=0)
+            plt.figure()
+            plt.plot(interpolated_recalls, avg_precision, label='Average PR Curve')
+            plt.xlabel("Recall")
+            plt.ylabel("Precision")
+            plt.title("Mean PR Curve @epoch %d" % epoch_num)
+            plt.grid(True)
+            plt.tight_layout()
+            plt.savefig("pr_curve_" + query_type + ".png")
+            plt.close()
+    
         return mAP, np.mean(entropies)
+
 
     def compute_bit_entropy(self, hash_codes):
         """
