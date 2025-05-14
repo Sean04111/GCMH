@@ -22,5 +22,5 @@ cw: 1
 K: 1.5
 KNN: 3000
 top_hamming: 5
-eval_interval: 100
-eval_epoch: 60
+eval_interval: 1
+eval_epoch: 0
