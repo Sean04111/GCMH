@@ -96,7 +96,7 @@ class CustomDataLoader:
                 'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = {}, raw_texts = {}),
                 'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = {}, raw_texts = {}),
             }
-        elif self.config['data_name'] == 'flickr':
+        elif self.config['data_name'] == 'old_flickr':
             #  load img_names and raw_texts
             img_names = np.load(base_path + 'img_names.npy')
 

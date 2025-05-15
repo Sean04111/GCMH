@@ -5,7 +5,7 @@ from torch.autograd import Variable
 import numpy as np
 from config.config import Config
 from dataloader.dataloader import CustomDataLoader
-from utils.similarity import cosine_similarity
+from utils.similarity import cosine_similarity, plot_sgc_distribution
 from models.ImgNet import ImgNet
 from models.TxtNet import TxtNet
 from metricer.metricer import Metricer
@@ -110,7 +110,9 @@ class Trainer:
             
         S = (1-self.config['possibility_weight']) * distance_matrix + self.config['possibility_weight'] * self.config['possibility_scale'] * p
         # S = (S - S.min()) / (S.max() - S.min() + 1e-6) 
-        print("S stats:", S.min().item(), S.max().item(), S.mean().item())
+        
+        plot_sgc_distribution(S)
+        
         S = S * 2.0 - 1
 
         log("Similarity matrix built.")

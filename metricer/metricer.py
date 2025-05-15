@@ -20,7 +20,7 @@ class Metricer:
         re_L = list([])
         for _, data in enumerate(database_loader):
 
-            if self.config['data_name'] == 'flickr':
+            if self.config['data_name'] == 'old_flickr':
                data_I, data_T, data_L, _,_, _ = data
             else:
                 data_I, data_T, data_L, _ = data
@@ -40,7 +40,7 @@ class Metricer:
         qu_L = list([])
         for idx, data in enumerate(query_loader):
 
-            if self.config['data_name'] == 'flickr':
+            if self.config['data_name'] == 'old_flickr':
                 data_I, data_T, data_L, _,_, _ = data
             else:
                 data_I, data_T, data_L, _ = data
