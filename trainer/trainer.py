@@ -110,7 +110,8 @@ class Trainer:
             
         S = (1-self.config['possibility_weight']) * distance_matrix + self.config['possibility_weight'] * self.config['possibility_scale'] * p
         # S = (S - S.min()) / (S.max() - S.min() + 1e-6) 
-        
+
+        # S = (S - S.min()) / (S.max() - S.min() + 1)
         plot_sgc_distribution(S)
         
         S = S * 2.0 - 1

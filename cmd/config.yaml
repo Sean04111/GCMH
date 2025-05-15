@@ -25,7 +25,7 @@ KNN: 3000
 
 # build multi KNN
 KNN_layers: 3
-KNN_base: 1000
-KNN_gap: 1000
-KNN_weight_base: 0.5
-KNN_weight_gap: 0.1
+KNN_base: 3000
+KNN_gap:  500
+KNN_weight_base: 0.3
+KNN_weight_gap: -0.1
