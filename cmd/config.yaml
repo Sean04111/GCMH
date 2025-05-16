@@ -4,10 +4,10 @@ data_name: nus
 model_name: vgg19
 batch_size: 64
 bit: 64
-learning_rate: 0.005
+learning_rate: 0.003
 momentum: 0.9
 weight_decay: 0.0005
-epoch_num: 100
+epoch_num: 50
 
 label_path: mini_nus-tc10-lall.mat
 text_path: mini_nus-tc10-yall.mat
@@ -24,3 +24,10 @@ KNN: 3000
 top_hamming: 5
 eval_interval: 1
 eval_epoch: 0
+
+pos_thresh: 0.7
+neg_thresh: 0.4
+rl_weight: 1.5
+warm_epoch: 20
+ranking_margin: 1.0
+using_anneal: True

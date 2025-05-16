@@ -12,6 +12,7 @@ from metricer.metricer import Metricer
 import datetime
 from utils.logger import log
 from tqdm import tqdm 
+from .ranking_loss import ranking_loss, get_margin
 
 
 
@@ -51,6 +52,7 @@ class Trainer:
         train_labels = torch.Tensor(train_labels).cuda()
 
         self.Sgc, self.distance_matrix, self.possibility_matrix = self._build_similarity_matrix(train_imgs, train_txts)
+        self.Sgc_raw = (self.Sgc + 1) / 2
 
         txt_feat_len = train_txts.size(1)
         self.ImgNet = ImgNet(code_len=self.config['bit'], txt_feat_len=txt_feat_len)
@@ -110,29 +112,56 @@ class Trainer:
 
         return S, distance_matrix, p
 
-    def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I):
+    def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch_num, total_epoch):
+        # 归一化
         norm_HashCode_Img = F.normalize(HashCode_Img)
         norm_HashCode_Txt = F.normalize(HashCode_Txt)
-
+    
+        # 相似度矩阵（模态内 & 跨模态）
         I_I = cosine_similarity(norm_HashCode_Img, norm_HashCode_Img)
         T_T = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Txt)
         I_T = cosine_similarity(norm_HashCode_Img, norm_HashCode_Txt)
         T_I = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Img)
-
+    
+        # Pairwise cross-modal 对角一致性损失（对应 DGCPN 的 Lpair）
         diagonal = I_T.diagonal()
-        all_1 = torch.rand(T_T.size(0)).fill_(1).cuda()
-        loss_pair = F.mse_loss(diagonal, self.config['K'] * all_1)
-
-        loss_dis_1 = F.mse_loss(T_T * (1-I), Sgc* (1-I))
-        loss_dis_2 = F.mse_loss(I_T * (1-I), Sgc* (1-I))
-        loss_dis_3 = F.mse_loss(I_I * (1-I), Sgc* (1-I))
-        loss_dis_4 = F.mse_loss(T_I * (1-I), Sgc* (1-I))
-
+        all_ones = torch.ones_like(diagonal)
+        loss_pair = F.mse_loss(diagonal, self.config['K'] * all_ones)
+    
+        # === 图结构损失（保持局部结构）===
+        loss_dis_1 = F.mse_loss(T_T * (1 - I), Sgc * (1 - I))  # T-T
+        loss_dis_2 = F.mse_loss(I_I * (1 - I), Sgc * (1 - I))  # I-I
+        loss_dis_3 = F.mse_loss(I_T * (1 - I), Sgc * (1 - I))  # I-T
+    
+        loss_g = (loss_dis_1 + loss_dis_2 + loss_dis_3) * self.config['dw']  # Lg 模块
+    
+        # === 跨模态一致性损失（Lc）===
         loss_cons = F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)
+        loss_cons = loss_cons * self.config['cw']
+    
+        # === Ranking Loss（跨模态排序）===
+        pos_thresh = self.config['pos_thresh']
+        neg_thresh = self.config['neg_thresh']
+        max_margin = self.config['ranking_margin']
+        # 是否使用退火策略
+        if self.config['using_anneal']:
+            margin = get_margin(epoch_num, total_epoch, max_margin, 0.1)
+        else:
+            margin = max_margin
+        
+        rl = ranking_loss(HashCode_Img, HashCode_Txt, Sgc_raw, margin, pos_thresh=pos_thresh, neg_thresh=neg_thresh)
+        loss_rl = rl * self.config['rl_weight']
+    
+        # === 总损失 ===
+        # 先用Lg warm up， 再用ranking loss 靠齐
+        if epoch_num >= self.config['warm_epoch']:
+            loss = loss_pair + loss_cons + loss_rl 
+        else:
+            loss = loss_pair + loss_g + loss_cons
 
-        loss = loss_pair + (loss_dis_1 + loss_dis_2 + loss_dis_3 ) * self.config['dw'] + loss_cons * self.config['cw']
-
+        
         return loss
+
 
     # 计算mAP@ALL
     def _eval(self, epoch_num):
@@ -148,8 +177,8 @@ class Trainer:
         # print("\n=== txt 查询集 哈希码熵 分布 ===")
         # print(f"Mean Entropy: {np.mean(entropies):.4f}")
 
-        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img',outdata_type = 'heat', verbose=True)
-        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', outdata_type='heat', verbose=True)
+        mAP_I2T , entropies_Q_img = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Img, retrieval_HashCode=re_HashCode_Txt, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='img',outdata_type = 'heat', verbose=False)
+        mAP_T2I, entropies_Q_txt = self.metricer.eval_mAP_all(query_HashCode=qu_HashCode_Txt, retrieval_HashCode=re_HashCode_Img, query_Label=qu_Label, retrieval_Label=re_Label,epoch_num=epoch_num, query_type='txt', outdata_type='heat', verbose=False)
 
         return mAP_I2T, mAP_T2I, entropies_Q_img, entropies_Q_txt
 
@@ -183,9 +212,19 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
                 Sgc = self.Sgc[index, :][:, index].cuda()
+                Sgc_raw = self.Sgc_raw[index, :][:, index].cuda()
+                
     
-                loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
-    
+                loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
+
+                # 计算ranking loss
+                # pos_thresh = self.config['pos_thresh']
+                # neg_thresh = self.config['neg_thresh']
+                # ranking_loss_weight = self.config['rl_weight']
+                
+                # rl = ranking_loss(HashCode_Img,HashCode_Txt,Sgc_raw,margin = 0.5, pos_thresh = pos_thresh, neg_thresh = neg_thresh)
+                # loss += ranking_loss_weight * rl
+                
                 self.opt_Img.zero_grad()
                 self.opt_Txt.zero_grad()
                 loss.backward()
@@ -195,12 +234,12 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
     
-                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
+                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
     
-                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
+                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
