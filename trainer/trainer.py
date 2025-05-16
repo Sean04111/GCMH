@@ -38,6 +38,15 @@ class Trainer:
         self.metricer = Metricer(config=self.config, qurey_img_names=self.query_img_names, qurey_raw_texts=self.query_raw_texts,database_img_names=self.database_img_names, database_raw_texts=self.database_raw_texts)
 
         train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
+
+        # 对clip做特殊化处理
+        if self.config['model_name'] == 'clip':
+            img_tensor = torch.Tensor(train_imgs)
+            train_imgs = (img_tensor - img_tensor.mean(dim=0)) / (img_tensor.std(dim=0) + 1e-6)
+            train_imgs = train_imgs.cuda()
+        else:
+            train_imgs = F.normalize(torch.Tensor(train_imgs).cuda())
+            
         train_txts = F.normalize(torch.Tensor(train_txts).cuda())
         train_labels = torch.Tensor(train_labels).cuda()
 
@@ -49,6 +58,21 @@ class Trainer:
 
         self.opt_Img = torch.optim.SGD(self.ImgNet.parameters(), lr = self.config['learning_rate'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
         self.opt_Txt = torch.optim.SGD(self.TxtNet.parameters(), lr = self.config['learning_rate'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
+
+        print("=== 标签检查 ===")
+        label_sum = train_labels.sum(dim=1).cpu().numpy()
+        print(f"训练集中每个样本平均标签数: {np.mean(label_sum):.2f}")
+        print(f"标签为全 0 的样本数: {np.sum(label_sum == 0)} / {len(label_sum)}")
+        print("=== 标签类别分布 ===")
+        label_distribution = train_labels.sum(dim=0).cpu().numpy()
+        print(f"每个类别对应的样本数: {label_distribution}")
+        print(f"类别最大/最小样本数: {label_distribution.max()} / {label_distribution.min()}")
+        print("=== 图像/文本特征分布 ===")
+        print("图像特征均值/方差:", train_imgs.mean().item(), train_imgs.std().item())
+        print("文本特征均值/方差:", train_txts.mean().item(), train_txts.std().item())
+        print("训练样本数量:", len(train_imgs))
+        print("训练集 loader 长度:", len(self.train_loader))
+        print("Query loader 长度:", len(self.query_loader))
 
     # 构建相似度矩阵
     def _build_similarity_matrix(self, images_feature, texts_feature):
