@@ -1,7 +1,7 @@
 base_path: ../../datasets/
 result_path: ../results/
-data_name: nus
-model_name: vgg19
+data_name: nus_resnet
+model_name: resnet
 batch_size: 64
 bit: 128
 learning_rate: 0.005
@@ -26,6 +26,6 @@ KNN: 3000
 # build multi KNN
 KNN_layers: 3
 KNN_base: 3000
-KNN_gap:  500
-KNN_weight_base: 0.3
+KNN_gap:  1000
+KNN_weight_base: 0.5
 KNN_weight_gap: -0.1

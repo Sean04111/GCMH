@@ -89,14 +89,7 @@ class CustomDataLoader:
 
         # todo: 后续看下database_v
 
-        if self.config['data_name'] == 'nus':
-            dataset = {
-                'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = {}, raw_texts = {}),
-                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = {}, raw_texts = {}),
-                'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = {}, raw_texts = {}),
-                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = {}, raw_texts = {}),
-            }
-        elif self.config['data_name'] == 'old_flickr':
+        if self.config['data_name'] == 'old_flickr':
             #  load img_names and raw_texts
             img_names = np.load(base_path + 'img_names.npy')
 
@@ -114,6 +107,13 @@ class CustomDataLoader:
                 'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = query_img_names, raw_texts = query_raw_texts),
                 'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = img_names, raw_texts = raw_texts),
                 'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = database_img_names, raw_texts = database_raw_texts),    
+            }
+        else:
+            dataset = {
+                'train': BatchData(images=train_images, texts=train_texts, labels=train_labels, img_names = {}, raw_texts = {}),
+                'query': BatchData(images=query_images, texts=query_texts, labels=query_labels, img_names = {}, raw_texts = {}),
+                'validation': BatchData(images=validation_images, texts=validation_texts, labels=validation_labels, img_names = {}, raw_texts = {}),
+                'database': BatchData(images=database_images, texts=database_texts, labels=database_labels, img_names = {}, raw_texts = {}),
             }
 
         self.dataloaders = {
