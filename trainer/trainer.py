@@ -113,26 +113,27 @@ class Trainer:
     def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I):
         norm_HashCode_Img = F.normalize(HashCode_Img)
         norm_HashCode_Txt = F.normalize(HashCode_Txt)
-
+    
         I_I = cosine_similarity(norm_HashCode_Img, norm_HashCode_Img)
         T_T = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Txt)
         I_T = cosine_similarity(norm_HashCode_Img, norm_HashCode_Txt)
         T_I = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Img)
-
+    
         diagonal = I_T.diagonal()
-        all_1 = torch.rand(T_T.size(0)).fill_(1).cuda()
+        all_1 = torch.ones_like(diagonal)
         loss_pair = F.mse_loss(diagonal, self.config['K'] * all_1)
+    
+        loss_dis_1 = F.mse_loss(T_T * (1-I), Sgc * (1-I))
+        loss_dis_2 = F.mse_loss(I_T * (1-I), Sgc * (1-I))
+        loss_dis_3 = F.mse_loss(I_I * (1-I), Sgc * (1-I))
+        loss_g = (loss_dis_1 + loss_dis_2 + loss_dis_3) * self.config['dw']
+    
+        loss_cons = (F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)) * self.config['cw']
+    
+        loss = loss_pair + loss_g + loss_cons
+    
+        return loss, loss_pair, loss_g, loss_cons
 
-        loss_dis_1 = F.mse_loss(T_T * (1-I), Sgc* (1-I))
-        loss_dis_2 = F.mse_loss(I_T * (1-I), Sgc* (1-I))
-        loss_dis_3 = F.mse_loss(I_I * (1-I), Sgc* (1-I))
-        loss_dis_4 = F.mse_loss(T_I * (1-I), Sgc* (1-I))
-
-        loss_cons = F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)
-
-        loss = loss_pair + (loss_dis_1 + loss_dis_2 + loss_dis_3 ) * self.config['dw'] + loss_cons * self.config['cw']
-
-        return loss
 
     # 计算mAP@ALL
     def _eval(self, epoch_num):
@@ -162,11 +163,17 @@ class Trainer:
     # 自训练
     def train(self):
         epoch_num = self.config['epoch_num']
+        
+        # === 初始化 CSV 日志文件 ===
+        with open("loss_log.csv", "w") as f:
+            f.write("epoch,total_loss,loss_pair,loss_g,loss_cons\n")
     
         for epoch in range(epoch_num):
             self.ImgNet.cuda().train()
             self.TxtNet.cuda().train()
-            total_loss = 0.0
+    
+            # 每轮累计值
+            sum_loss, sum_pair, sum_g, sum_cons = 0.0, 0.0, 0.0, 0.0
     
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), desc=f"Epoch {epoch+1}/{epoch_num}")
             for idx, data in pbar:
@@ -184,7 +191,8 @@ class Trainer:
                 _, HashCode_Txt = self.TxtNet(txt)
                 Sgc = self.Sgc[index, :][:, index].cuda()
     
-                loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
+                # === 一阶段完整更新 ===
+                loss, loss_pair, loss_g, loss_cons = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I)
     
                 self.opt_Img.zero_grad()
                 self.opt_Txt.zero_grad()
@@ -192,31 +200,49 @@ class Trainer:
                 self.opt_Img.step()
                 self.opt_Txt.step()
     
+                # === 单独优化图像网络 ===
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
-    
-                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
+                loss_img, _, _, _ = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I)
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
     
-                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
+                # === 单独优化文本网络 ===
+                loss_txt, _, _, _ = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
     
-                total_loss += loss.item()
-                avg_loss = total_loss / (idx + 1)
+                # === 累加统计值 ===
+                sum_loss += loss.item()
+                sum_pair += loss_pair.item()
+                sum_g += loss_g.item()
+                sum_cons += loss_cons.item()
+    
+                avg_loss = sum_loss / (idx + 1)
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
-
-            
+    
+            # === 每轮平均值 ===
+            avg_loss = sum_loss / len(self.train_loader)
+            avg_pair = sum_pair / len(self.train_loader)
+            avg_g = sum_g / len(self.train_loader)
+            avg_cons = sum_cons / len(self.train_loader)
+    
+            # === 打印 + 写入 CSV ===
+            log(f"[Epoch {epoch}] Total: {avg_loss:.4f} | Lpair: {avg_pair:.4f} | Lg: {avg_g:.4f} | Lcons: {avg_cons:.4f}")
+            with open("loss_log.csv", "a") as f:
+                f.write(f"{epoch},{avg_loss:.4f},{avg_pair:.4f},{avg_g:.4f},{avg_cons:.4f}\n")
+    
+            # === mAP 验证阶段 ===
             if epoch >= self.config['eval_epoch']:
                 mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval(epoch)
                 log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
                     epoch, avg_loss, mAP_I2T, mAP_T2I, e_q_i, e_q_t))
-        
+    
                 if mAP_I2T + mAP_T2I > self.best_mAP:
                     log('logging the best score...')
                     self.best_mAP = mAP_I2T + mAP_T2I
                     self._save_best_result(mAP_I2T, mAP_T2I)
+
             
