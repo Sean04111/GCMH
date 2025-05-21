@@ -113,54 +113,43 @@ class Trainer:
         return S, distance_matrix, p
 
     def _loss_cal(self, HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch_num, total_epoch):
-        # 归一化
         norm_HashCode_Img = F.normalize(HashCode_Img)
         norm_HashCode_Txt = F.normalize(HashCode_Txt)
     
-        # 相似度矩阵（模态内 & 跨模态）
         I_I = cosine_similarity(norm_HashCode_Img, norm_HashCode_Img)
         T_T = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Txt)
         I_T = cosine_similarity(norm_HashCode_Img, norm_HashCode_Txt)
         T_I = cosine_similarity(norm_HashCode_Txt, norm_HashCode_Img)
     
-        # Pairwise cross-modal 对角一致性损失（对应 DGCPN 的 Lpair）
         diagonal = I_T.diagonal()
         all_ones = torch.ones_like(diagonal)
         loss_pair = F.mse_loss(diagonal, self.config['K'] * all_ones)
     
-        # === 图结构损失（保持局部结构）===
-        loss_dis_1 = F.mse_loss(T_T * (1 - I), Sgc * (1 - I))  # T-T
-        loss_dis_2 = F.mse_loss(I_I * (1 - I), Sgc * (1 - I))  # I-I
-        loss_dis_3 = F.mse_loss(I_T * (1 - I), Sgc * (1 - I))  # I-T
+        loss_dis_1 = F.mse_loss(T_T * (1 - I), Sgc * (1 - I))
+        loss_dis_2 = F.mse_loss(I_I * (1 - I), Sgc * (1 - I))
+        loss_dis_3 = F.mse_loss(I_T * (1 - I), Sgc * (1 - I))
+        loss_g = (loss_dis_1 + loss_dis_2 + loss_dis_3) * self.config['dw']
     
-        loss_g = (loss_dis_1 + loss_dis_2 + loss_dis_3) * self.config['dw']  # Lg 模块
+        loss_cons = (F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)) * self.config['cw']
     
-        # === 跨模态一致性损失（Lc）===
-        loss_cons = F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)
-        loss_cons = loss_cons * self.config['cw']
-    
-        # === Ranking Loss（跨模态排序）===
         pos_thresh = self.config['pos_thresh']
         neg_thresh = self.config['neg_thresh']
         max_margin = self.config['ranking_margin']
-        # 是否使用退火策略
         if self.config['using_anneal']:
             margin = get_margin(epoch_num, total_epoch, max_margin, 0.1)
         else:
             margin = max_margin
-        
+    
         rl = ranking_loss(HashCode_Img, HashCode_Txt, Sgc_raw, margin, pos_thresh=pos_thresh, neg_thresh=neg_thresh)
         loss_rl = rl * self.config['rl_weight']
     
-        # === 总损失 ===
-        # 先用Lg warm up， 再用ranking loss 靠齐
         if epoch_num >= self.config['warm_epoch']:
-            loss = loss_pair + loss_cons + loss_rl 
+            loss = loss_pair + loss_cons + loss_rl
         else:
             loss = loss_pair + loss_g + loss_cons
+    
+        return loss, loss_pair, loss_g, loss_cons, loss_rl
 
-        
-        return loss
 
 
     # 计算mAP@ALL
@@ -191,12 +180,14 @@ class Trainer:
     # 自训练
     def train(self):
         epoch_num = self.config['epoch_num']
-    
+        with open("loss_log_RL.csv", "w") as f:
+            f.write("epoch,total_loss,loss_pair,loss_g,loss_cons,ranking_loss\n")
         for epoch in range(epoch_num):
             self.ImgNet.cuda().train()
             self.TxtNet.cuda().train()
-            total_loss = 0.0
-    
+
+            sum_loss, sum_pair, sum_g, sum_cons, sum_rl = 0.0, 0.0, 0.0, 0.0, 0.0
+            
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), desc=f"Epoch {epoch+1}/{epoch_num}")
             for idx, data in pbar:
                 if self.config['data_name'] == 'old_flickr':
@@ -215,7 +206,7 @@ class Trainer:
                 Sgc_raw = self.Sgc_raw[index, :][:, index].cuda()
                 
     
-                loss = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
+                loss, loss_pair, loss_g, loss_cons, loss_rl = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch, epoch_num)
 
                 # 计算ranking loss
                 # pos_thresh = self.config['pos_thresh']
@@ -234,21 +225,35 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
     
-                loss_img = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I, Sgc_raw, epoch,epoch_num)
+                loss_img,_,_,_,_ = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
     
-                loss_txt = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
+                loss_txt,_,_,_,_  = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
     
-                total_loss += loss.item()
-                avg_loss = total_loss / (idx + 1)
+                sum_loss += loss.item()
+                sum_pair += loss_pair.item()
+                sum_g += loss_g.item()
+                sum_cons += loss_cons.item()
+                sum_rl += loss_rl.item()
+                
+                avg_loss = sum_loss / (idx + 1)
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
 
+
+            avg_loss = sum_loss / len(self.train_loader)
+            avg_pair = sum_pair / len(self.train_loader)
+            avg_g = sum_g / len(self.train_loader)
+            avg_cons = sum_cons / len(self.train_loader)
+            avg_rl = sum_rl / len(self.train_loader)
             
+            with open("loss_log_RL.csv", "a") as f:
+                f.write(f"{epoch},{avg_loss:.4f},{avg_pair:.4f},{avg_g:.4f},{avg_cons:.4f},{avg_rl:.4f}\n")
+                        
             if epoch >= self.config['eval_epoch']:
                 mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval(epoch)
                 log('Epoch: {}, Loss: {:.4f}, mAP_I2T: {:.4f}, mAP_T2I: {:.4f}, entropies_query_image: {:.4f}, entropies_query_text: {:.4f}'.format(
