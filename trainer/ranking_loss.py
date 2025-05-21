@@ -64,3 +64,17 @@ def ranking_loss(HI, HT, Sgc, margin, pos_thresh=0.6, neg_thresh=0.3):
         return torch.tensor(0.0, requires_grad=True, device=device)
 
     return total_loss.mean()
+
+
+def entropy_loss(H):
+    """
+    H: Tensor of shape [B, D] in range [-1, 1]
+    作用：鼓励每一位 bit 在整个 batch 中更均匀（信息熵更高）
+    """
+    H = (H + 1) / 2  # [-1,1] → [0,1]
+    p = torch.mean(H, dim=0)  # [D] 每一位的正值概率
+    entropy = -p * torch.log(p + 1e-8) - (1 - p) * torch.log(1 - p + 1e-8)
+    return -torch.mean(entropy)  # 负号使其作为 loss（最大化熵）
+
+
+

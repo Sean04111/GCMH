@@ -12,7 +12,8 @@ from metricer.metricer import Metricer
 import datetime
 from utils.logger import log
 from tqdm import tqdm 
-from .ranking_loss import ranking_loss, get_margin
+from .ranking_loss import ranking_loss, get_margin,entropy_loss
+from .infoNCE import infoNCE_graph_soft
 
 
 
@@ -131,7 +132,8 @@ class Trainer:
         loss_g = (loss_dis_1 + loss_dis_2 + loss_dis_3) * self.config['dw']
     
         loss_cons = (F.mse_loss(I_T, I_I) + F.mse_loss(I_T, T_T) + F.mse_loss(I_I, T_T) + F.mse_loss(I_T, T_I)) * self.config['cw']
-    
+
+        # 计算Ranking Loss
         pos_thresh = self.config['pos_thresh']
         neg_thresh = self.config['neg_thresh']
         max_margin = self.config['ranking_margin']
@@ -142,13 +144,27 @@ class Trainer:
     
         rl = ranking_loss(HashCode_Img, HashCode_Txt, Sgc_raw, margin, pos_thresh=pos_thresh, neg_thresh=neg_thresh)
         loss_rl = rl * self.config['rl_weight']
+
+        # 计算infoNCE
+        info_loss_1 = infoNCE_graph_soft(HashCode_Img,HashCode_Txt,Sgc_raw,0.07, pos_thresh, neg_thresh)
+        info_loss_2 = infoNCE_graph_soft(HashCode_Txt,HashCode_Img,Sgc_raw,0.07, pos_thresh, neg_thresh)
+        total_info_loss = (info_loss_1 + info_loss_2) / 2
+        loss_info = total_info_loss.mean() * self.config['info_weight']
+
+        # 计算entropy损失
+        loss_entropy = (entropy_loss(HashCode_Img) + entropy_loss(HashCode_Txt)) * 0.5 * self.config['entropy_weight']
     
-        if epoch_num >= self.config['warm_epoch']:
-            loss = loss_pair + loss_cons + loss_rl
-        else:
+        if epoch_num <= self.config['warm_epoch']:
             loss = loss_pair + loss_g + loss_cons
-    
-        return loss, loss_pair, loss_g, loss_cons, loss_rl
+        elif self.config['loss_2']=='rl':
+            loss = loss_pair + loss_cons + loss_rl
+        elif self.config['loss_2'] == 'info':
+            loss = loss_pair + loss_g + loss_info
+        elif self.config['loss_2'] == 'entropy':
+            loss = loss_pair + loss_g + loss_cons + loss_entropy
+            
+            
+        return loss, loss_pair, loss_g, loss_cons, loss_rl, loss_info
 
 
 
@@ -180,13 +196,13 @@ class Trainer:
     # 自训练
     def train(self):
         epoch_num = self.config['epoch_num']
-        with open("loss_log_RL.csv", "w") as f:
-            f.write("epoch,total_loss,loss_pair,loss_g,loss_cons,ranking_loss\n")
+        with open("loss_log_info.csv", "w") as f:
+            f.write("epoch,total_loss,loss_pair,loss_g,loss_cons,ranking_loss, info_loss\n")
         for epoch in range(epoch_num):
             self.ImgNet.cuda().train()
             self.TxtNet.cuda().train()
 
-            sum_loss, sum_pair, sum_g, sum_cons, sum_rl = 0.0, 0.0, 0.0, 0.0, 0.0
+            sum_loss, sum_pair, sum_g, sum_cons, sum_rl, sum_info = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
             
             pbar = tqdm(enumerate(self.train_loader), total=len(self.train_loader), desc=f"Epoch {epoch+1}/{epoch_num}")
             for idx, data in pbar:
@@ -206,7 +222,7 @@ class Trainer:
                 Sgc_raw = self.Sgc_raw[index, :][:, index].cuda()
                 
     
-                loss, loss_pair, loss_g, loss_cons, loss_rl = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch, epoch_num)
+                loss, loss_pair, loss_g, loss_cons, loss_rl, loss_info = self._loss_cal(HashCode_Img, HashCode_Txt, Sgc, I, Sgc_raw, epoch, epoch_num)
 
                 # 计算ranking loss
                 # pos_thresh = self.config['pos_thresh']
@@ -225,12 +241,12 @@ class Trainer:
                 _, HashCode_Img = self.ImgNet(img)
                 _, HashCode_Txt = self.TxtNet(txt)
     
-                loss_img,_,_,_,_ = self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I, Sgc_raw, epoch,epoch_num)
+                loss_img,_,_,_,_ ,_= self._loss_cal(HashCode_Img, HashCode_Txt.sign().detach(), Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Img.zero_grad()
                 loss_img.backward()
                 self.opt_Img.step()
     
-                loss_txt,_,_,_,_  = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
+                loss_txt,_,_,_,_ ,_ = self._loss_cal(HashCode_Img.sign().detach(), HashCode_Txt, Sgc, I, Sgc_raw, epoch,epoch_num)
                 self.opt_Txt.zero_grad()
                 loss_txt.backward()
                 self.opt_Txt.step()
@@ -240,6 +256,7 @@ class Trainer:
                 sum_g += loss_g.item()
                 sum_cons += loss_cons.item()
                 sum_rl += loss_rl.item()
+                sum_info += loss_info.item()
                 
                 avg_loss = sum_loss / (idx + 1)
                 pbar.set_postfix(loss=f"{avg_loss:.4f}")
@@ -250,9 +267,10 @@ class Trainer:
             avg_g = sum_g / len(self.train_loader)
             avg_cons = sum_cons / len(self.train_loader)
             avg_rl = sum_rl / len(self.train_loader)
+            avg_info = sum_info/len(self.train_loader)
             
-            with open("loss_log_RL.csv", "a") as f:
-                f.write(f"{epoch},{avg_loss:.4f},{avg_pair:.4f},{avg_g:.4f},{avg_cons:.4f},{avg_rl:.4f}\n")
+            with open("loss_log_info.csv", "a") as f:
+                f.write(f"{epoch},{avg_loss:.4f},{avg_pair:.4f},{avg_g:.4f},{avg_cons:.4f},{avg_rl:.4f},{avg_info:.4f}\n")
                         
             if epoch >= self.config['eval_epoch']:
                 mAP_I2T, mAP_T2I, e_q_i, e_q_t = self._eval(epoch)
