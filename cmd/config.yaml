@@ -3,7 +3,7 @@ result_path: ../results/
 data_name: nus
 model_name: vgg19
 batch_size: 64
-bit: 64
+bit: 16
 learning_rate: 0.003
 momentum: 0.9
 weight_decay: 0.0005
