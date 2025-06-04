@@ -1,0 +1,2 @@
+config is {'base_path': '../../datasets/', 'result_path': '../results/', 'data_name': 'nus', 'model_name': 'vgg19', 'batch_size': 64, 'bit': 64, 'learning_rate': 0.005, 'momentum': 0.9, 'weight_decay': 0.0005, 'epoch_num': 100, 'label_path': 'mini_nus-tc10-lall.mat', 'text_path': 'mini_nus-tc10-yall.mat', 'image_path': 'mini_nus-tc10-iall.mat', 'distance_weight': 0.01, 'possibility_weight': 0.3, 'possibility_scale': 4000, 'dw': 1, 'cw': 1, 'K': 1.5, 'KNN': 3000, 'top_hamming': 5, 'eval_interval': 1, 'eval_epoch': 0}
+best mAP_I2T : 0.6274565121458898 best mAP_T2I : 0.613
